@@ -33,7 +33,7 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 
 ## Progress
 
-- [ ] Day 1: repo public, environment pinned, this README up
+- [x] Day 1: repo public ([github.com/vaishak-v-nair/Gurutva](https://github.com/vaishak-v-nair/Gurutva)), environment pinned, this README up
 - [ ] Week 0: dataset verified (public license · published inversion · potential-field · L2/Tikhonov, not IRLS · no active bound constraints) — verification note added here
 - [ ] Week 1: introduction posted on the SimPEG forum
 - [x] G-vs-analytic pytest passing (2026-07-29: SimPEG matches the analytic point mass to ~1e-8 relative; z-up sign convention established empirically — see `src/units_probe.py` and `tests/test_g_analytic.py`)
