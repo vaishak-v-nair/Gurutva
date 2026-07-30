@@ -35,7 +35,7 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 
 - [x] Day 1: repo public ([github.com/vaishak-v-nair/Gurutva](https://github.com/vaishak-v-nair/Gurutva)), environment pinned, this README up
 - [x] Week 0: dataset verified — **Utah FORGE 3D gravity** (see the verification note below)
-- [ ] Week 1: introduction posted on the SimPEG forum
+- [x] Week 1: introduction posted on the SimPEG forum (2026-08-01)
 - [x] G-vs-analytic pytest passing (2026-07-29: SimPEG matches the analytic point mass to ~1e-8 relative; z-up sign convention established empirically — see `src/units_probe.py` and `tests/test_g_analytic.py`)
 - [x] Coarse re-inversion running and gated (2026-07-31): own β=2191 by discrepancy at the measured 0.76 mGal floor; achieved RMS 0.760; DC −216.9 mGal fitted and reported; declared choices below
 - [x] The 2.55 bridge built (2026-08-01): analytic slab re-reduction (first principles, never the untrusted gFA columns) + terrain-correction rescale + 20 m height shift — pinned by hand-arithmetic test
@@ -46,7 +46,7 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 - [x] MC validation gates passed: N=30,000 Matheron samples vs closed form — median rel. err 0.55% (<2%), 95th pct 1.6% (<5%), 0.24% of cells beyond 3× MC standard error (≤1%)
 - [x] SBC coverage gate passed: 95.01% pooled coverage of the 95% interval over 20 prior-drawn-truth repetitions (realistic-body diagnostic deferred with the model comparison — blocked on the 2.55 bridge)
 - [x] Provenance defense artifact added (2026-08-01): β sweep across two decades, depth-weighting on/off comparison, Σd stack — `figures/provenance.png`, pinned by `tests/test_provenance.py`
-- [ ] Week-4 burn checkpoint: actual hours recorded, windows recomputed
+- [x] Burn checkpoint run early — the work finished first: Phase-1 core in ~22.5 calendar hours vs a 7-12 week budget; asterisks and recomputed windows in [BURN.md](BURN.md)
 
 ## Week-0 dataset verification note (2026-07-30)
 
