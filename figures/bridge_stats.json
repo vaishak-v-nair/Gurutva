@@ -1,0 +1,13 @@
+{
+ "ladder": {
+  "DC only": 8.323869898108432,
+  "+ plane": 2.7486248485986793,
+  "+ quadratic": 2.4388576838057014
+ },
+ "corr_all": 0.20579306646249823,
+ "corr_constrained": 0.38770661621648517,
+ "baseline_corr_all": 0.125,
+ "baseline_corr_constrained": 0.287,
+ "bridged_rms": 0.759999999999999,
+ "beta": 2917.8141663077545
+}

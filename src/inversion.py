@@ -30,15 +30,23 @@ TARGET_RMS = 0.76          # mGal — measured floor (figures/floor_stats.json)
 REF_BASIN, REF_BASEMENT = -0.25, -0.02   # g/cc contrast vs 2.67 background
 
 
-def assemble():
-    """G (SimPEG, ram), stations, observed data, mref, active mesh."""
+def assemble(bridged: bool = False):
+    """G (SimPEG, ram), stations, observed data, mref, active mesh.
+
+    bridged=True uses the 2.55 re-reduction + 20 m height shift
+    (src/bridge.py) — the published run's data conventions."""
     from simpeg import maps
     from simpeg.potential_fields import gravity
 
     inv = forge_data.inversion_stations()
-    stations = np.column_stack([inv.Easting, inv.Northing,
-                                inv.z_sensor]).astype(float)
-    d_obs = inv.gCBGA.to_numpy(float)
+    if bridged:
+        from . import bridge
+        stations = bridge.bridged_stations(inv)
+        d_obs = bridge.bridge_data(inv)
+    else:
+        stations = np.column_stack([inv.Easting, inv.Northing,
+                                    inv.z_sensor]).astype(float)
+        d_obs = inv.gCBGA.to_numpy(float)
 
     tree, active, meta = mesh_mod.build_mesh()
     n_act = int(active.sum())
@@ -74,11 +82,30 @@ def depth_weights(G: np.ndarray) -> np.ndarray:
     return wr / wr.max()
 
 
-def residual_data(G, d_obs, mref):
-    """Residual after reference model and the declared DC constant."""
+def regional_basis(stations, order: int):
+    """Nuisance basis: order 0 = DC; order 2 = quadratic surface — the
+    declared surrogate for the published mesh's ~50 km padding cells, which
+    were never delivered (the report states no regional trend was removed
+    from the DATA; the regional-looking ~5 mGal lives in their padding)."""
+    x = (stations[:, 0] - stations[:, 0].mean()) / 1000.0
+    y = (stations[:, 1] - stations[:, 1].mean()) / 1000.0
+    cols = [np.ones(len(x))]
+    if order >= 1:
+        cols += [x, y]
+    if order >= 2:
+        cols += [x * x, x * y, y * y]
+    return np.column_stack(cols)
+
+
+def residual_data(G, d_obs, mref, stations=None, order: int = 0):
+    """Residual after reference model and the declared nuisance surface."""
     r = d_obs - G @ mref
-    dc = float(np.mean(r))
-    return r - dc, dc
+    if order == 0 or stations is None:
+        dc = float(np.mean(r))
+        return r - dc, np.array([dc])
+    A = regional_basis(stations, order)
+    coef, *_ = np.linalg.lstsq(A, r, rcond=None)
+    return r - A @ coef, coef
 
 
 def solve_map(G, r, wr, beta):
@@ -127,15 +154,18 @@ def tune_beta(G, r, wr, target=TARGET_RMS, lo=1e-6, hi=1e6, iters=60):
     return np.sqrt(lo * hi)
 
 
-def run():
+def run(bridged: bool = False):
     """Full pass-one inversion; returns everything the notebook needs."""
-    a = assemble()
+    a = assemble(bridged=bridged)
     wr = depth_weights(a["G"])
-    r, dc = residual_data(a["G"], a["d_obs"], a["mref"])
+    order = 2 if bridged else 0     # declared: quad surrogate for undelivered
+    r, coef = residual_data(a["G"], a["d_obs"], a["mref"],   # padding cells
+                            stations=a["stations"], order=order)
     beta = tune_beta(a["G"], r, wr)
     dm = solve_map(a["G"], r, wr, beta)
-    d_pred = a["G"] @ (a["mref"] + dm) + dc
+    A = regional_basis(a["stations"], order)
+    d_pred = a["G"] @ (a["mref"] + dm) + A @ coef
     misfit = a["d_obs"] - d_pred
-    return dict(**a, wr=wr, dc=dc, beta=beta, dm=dm, model=a["mref"] + dm,
+    return dict(**a, wr=wr, dc=coef, beta=beta, dm=dm, model=a["mref"] + dm,
                 d_pred=d_pred, misfit=misfit,
                 rms=float(np.sqrt(np.mean(misfit**2))))
