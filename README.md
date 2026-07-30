@@ -48,6 +48,14 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 - [x] Provenance defense artifact added (2026-08-01): β sweep across two decades, depth-weighting on/off comparison, Σd stack — `figures/provenance.png`, pinned by `tests/test_provenance.py`
 - [x] Burn checkpoint run early — the work finished first: Phase-1 core in ~22.5 calendar hours vs a 7-12 week budget; asterisks and recomputed windows in [BURN.md](BURN.md)
 
+## Phase 2 progress
+
+- [x] Design note (`docs/phase2-design.md`): dimensionality committed by measurement — trace(R)=32.4, NPE on top-128 KL modes
+- [x] Mode machinery gated: reproduces the validated Woodbury posterior/MAP to 1e-8 (`tests/test_modes.py`)
+- [x] **S1 gate PASSED (2026-08-02)**: NPE trained on 60k linear-limit simulations finds the exact answer — median mean-error 0.08σ, median σ-error 2.9%, SBC tails 5.08% vs nominal 5%, 90%-coverage 88.8% (mild overconfidence recorded, not hidden) — `figures/s1_npe.png`
+- [ ] S2: first beyond-Gaussian result (basin/basement mixture prior), SBC-calibrated
+- [ ] S3: Moho spike (kill-criterion attached) · E2: dark-matter twin
+
 ## Week-0 dataset verification note (2026-07-30)
 
 **Chosen: Utah FORGE 3D gravity — DOE Geothermal Data Repository submission 1144** ([gdr.openei.org/submissions/1144](https://gdr.openei.org/submissions/1144), doi:[10.15121/1542061](https://doi.org/10.15121/1542061), CC-BY 4.0). 518 ground-gravity stations (323 used in the published inversion) over the Utah FORGE geothermal site, Milford Valley, Utah. The archive is self-contained: the gravity data, the published SimPEG inversion report (Witter / Innovate Geothermal, May 2019), TWO delivered 268,773-cell 3D density models, per-station misfits (published RMS ≈ 0.03 mGal), and the basement surfaces in a geoh5 workspace — meaning the reproduction can be checked **numerically, cell by cell**.
