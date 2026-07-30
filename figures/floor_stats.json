@@ -1,0 +1,12 @@
+{
+ "n_stations": 323,
+ "rms_floor_mgal": 0.755388596795968,
+ "mean_abs_floor_mgal": 0.5346134652017498,
+ "p95_abs_floor_mgal": 1.5492892847146469,
+ "max_abs_floor_mgal": 2.18634634939752,
+ "published_rms_mgal": 0.0298,
+ "signal_span_mgal": 12.531459688575698,
+ "fine_cells_excluded": 3978,
+ "excluded_abs_mass_fraction": 0.003653697320254875,
+ "n_active_cells": 10093
+}
