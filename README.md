@@ -37,9 +37,10 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 - [x] Week 0: dataset verified — **Utah FORGE 3D gravity** (see the verification note below)
 - [ ] Week 1: introduction posted on the SimPEG forum
 - [x] G-vs-analytic pytest passing (2026-07-29: SimPEG matches the analytic point mass to ~1e-8 relative; z-up sign convention established empirically — see `src/units_probe.py` and `tests/test_g_analytic.py`)
-- [ ] Published inversion reproduced (qualitative) + coarse-mesh re-inversion (gated object)
-- [ ] Regularization choice defended in prose; α→prior mapping (precision form, depth weighting declared) documented
-- [ ] Mean-match test passing
+- [x] Coarse re-inversion running and gated (2026-07-31): own β=2191 by discrepancy at the measured 0.76 mGal floor; achieved RMS 0.760; DC −216.9 mGal fitted and reported; declared choices below
+- [ ] Published-model comparison — **BLOCKED on the 2.55 re-reduction bridge, by measurement**: the published model misfits our delivered 2.67 data by 7.94 mGal RMS (10× our fit), because it was built to fit differently-reduced data; comparing models before matching data would be theater
+- [x] Regularization choice defended in prose; α→prior mapping (precision form, depth weighting declared) — see "Declared inversion choices" below
+- [x] Mean-match test passing (Woodbury vs whitened-CG, rel < 1e-7 — the unwhitened system stalls past 20k CG iterations, exactly the conditioning failure the plan's whitening instruction predicted)
 - [ ] Closed-form posterior diagonal computed (whitened data-space solve, active cells only)
 - [ ] MC validation gates passed
 - [ ] SBC coverage gate passed; realistic-body diagnostic figure added
@@ -68,6 +69,11 @@ Verified by independent research agents and then adversarially reviewed (the ref
 6. **The coarse-mesh error floor gets measured, not assumed** — and now it is measured (2026-07-30): **floor RMS = 0.755 mGal** (p95 1.55, max 2.19) across the 323 stations — 25× the published 0.0298 mGal RMS, ~6% of the 12.5 mGal signal span. Method: the published 268,773-cell model forward-modeled two ways — exact prisms on its validated native geometry vs SimPEG on our 10,093-cell mesh (mass-preserving projection; 0.37% of |mass| sits above our station-derived topo and was excluded from both sides). Cross-validated: SimPEG and an independent exact-prism implementation agree on the coarse forward to 4×10⁻⁶ mGal. **Consequence, stated before any inversion runs: this repo's honest misfit target is ≈0.76 mGal (floor ⊕ published RMS) — never their 0.03, which no 10k-cell mesh can reach.** Map and numbers: `figures/error_floor.png`, `figures/floor_stats.json`.
 
 **Backup:** Clear Lake Volcanic Field (Mitchell et al. 2023; five of six checks pass; bounds active in 0.07% of cells — usable only with a documented waiver). **Guaranteed fallback:** the SimPEG L2 tutorial (synthetic, all checks pass). **Phase-2 earmark — the space one:** the South American Moho from satellite gravity (Uieda & Barbosa 2017) — mathematically wrong-shaped for Phase 1 (nonlinear interface inversion), but published with *zero* uncertainty estimates, making it a genuine future target for the nonlinear engine: error bars on a continent's crust, from space data.
+
+## Declared inversion choices (pass one, 2026-07-31)
+
+Every choice is ours and stated, because no settings table exists for the original:
+**Data**: the delivered, verified gCBGA(2.67 g/cc) — a declared deviation from the published run's 2.55+upward-continued data; the bridge is the next milestone and blocks any model comparison (measured consequence above). **Reference model**: the published two-layer geology as contrast vs the 2.67 background (−0.25 basin fill above the Top-of-Granite surface from the geoh5, −0.02 below). **DC**: one constant (−216.9 mGal) fitted and reported — a local mesh cannot produce the regional level. **Prior**: diagonal Gaussian in precision form, sensitivity-based depth weighting (wr = (Σ G²)^¼, normalized) as cell weights — the Li–Oldenburg role, declared as part of the prior per the plan. **β = 2191**: discrepancy principle bisected onto the *measured* coarse-mesh floor (0.76 mGal), never the unreachable published 0.03. **Solver**: closed-form data-space (Woodbury); independently verified each run by a whitened-CG solve of the same quadratic (mean-match gate, rel < 1e-7). **No bounds anywhere** — the Gaussian posterior stays exact.
 
 ## Honesty rules
 
