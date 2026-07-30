@@ -45,7 +45,7 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 - [x] Closed-form posterior diagonal computed (data-space solve, active cells only) — 2026-07-31
 - [x] MC validation gates passed: N=30,000 Matheron samples vs closed form — median rel. err 0.55% (<2%), 95th pct 1.6% (<5%), 0.24% of cells beyond 3× MC standard error (≤1%)
 - [x] SBC coverage gate passed: 95.01% pooled coverage of the 95% interval over 20 prior-drawn-truth repetitions (realistic-body diagnostic deferred with the model comparison — blocked on the 2.55 bridge)
-- [ ] Provenance defense artifact added
+- [x] Provenance defense artifact added (2026-08-01): β sweep across two decades, depth-weighting on/off comparison, Σd stack — `figures/provenance.png`, pinned by `tests/test_provenance.py`
 - [ ] Week-4 burn checkpoint: actual hours recorded, windows recomputed
 
 ## Week-0 dataset verification note (2026-07-30)
@@ -75,6 +75,10 @@ Verified by independent research agents and then adversarially reviewed (the ref
 
 Every choice is ours and stated, because no settings table exists for the original:
 **Data**: the delivered, verified gCBGA(2.67 g/cc) — a declared deviation from the published run's 2.55+upward-continued data; the bridge is the next milestone and blocks any model comparison (measured consequence above). **Reference model**: the published two-layer geology as contrast vs the 2.67 background (−0.25 basin fill above the Top-of-Granite surface from the geoh5, −0.02 below). **DC**: one constant (−216.9 mGal) fitted and reported — a local mesh cannot produce the regional level. **Prior**: diagonal Gaussian in precision form, sensitivity-based depth weighting (wr = (Σ G²)^¼, normalized) as cell weights — the Li–Oldenburg role, declared as part of the prior per the plan. **β = 2191**: discrepancy principle bisected onto the *measured* coarse-mesh floor (0.76 mGal), never the unreachable published 0.03. **Solver**: closed-form data-space (Woodbury); independently verified each run by a whitened-CG solve of the same quadratic (mean-match gate, rel < 1e-7). **No bounds anywhere** — the Gaussian posterior stays exact. **Bridge (bridged runs)**: gCBGA(2.55) = gCBGA(2.67) + 2πG·0.12·h(NAVD88) + (2.55/2.67−1)·(iztc+oztc); forward evaluated at z+20 m for the published run's upward continuation; quadratic nuisance surface declared as surrogate for the undelivered padding cells; Bullard-B curvature difference (<0.1 mGal) accepted into the error budget.
+
+## The objection, pre-answered
+
+*"Isn't the uncertainty map just your regularization choice, replotted?"* Partly — necessarily — and now measurably. Only ~12% of even the best-constrained cell's variance is data-informed at this survey and mesh; we print that number instead of hiding it. What the provenance artifact shows is what survives changing the choice: sweep the prior strength β across **two full decades** (β*/10 to 10β*) and the *pattern* of where the data constrain the earth is essentially unchanged (informed-map correlation 0.95/0.91 at the decade edges; recovered-model correlation 0.90/0.97) — the absolute scale of σ belongs to the prior, the *shape of knowledge* belongs to the data, which is why the informed-fraction map, not raw σ, is the product. The data-error model is a measured stack, not an assertion: 0.755 mGal mesh floor (measured by forward-modeling the published model both ways) ⊕ 0.03 published fit ⊕ ~0.1 declared bridge approximations. And one honest surprise, reported against our own expectation: turning depth weighting **off** does *not* collapse structure to the surface here (|Δρ| mass depth moves only 1008 → 1044 m) — the volume-scaled octree and the reference-model anchor already neutralize most of the textbook pathology on this mesh. We keep depth weighting as a declared, physics-motivated choice — and we show you exactly how little hangs on it.
 
 ## Honesty rules
 
