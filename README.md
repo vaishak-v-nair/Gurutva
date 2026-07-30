@@ -41,9 +41,9 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 - [ ] Published-model comparison — **BLOCKED on the 2.55 re-reduction bridge, by measurement**: the published model misfits our delivered 2.67 data by 7.94 mGal RMS (10× our fit), because it was built to fit differently-reduced data; comparing models before matching data would be theater
 - [x] Regularization choice defended in prose; α→prior mapping (precision form, depth weighting declared) — see "Declared inversion choices" below
 - [x] Mean-match test passing (Woodbury vs whitened-CG, rel < 1e-7 — the unwhitened system stalls past 20k CG iterations, exactly the conditioning failure the plan's whitening instruction predicted)
-- [ ] Closed-form posterior diagonal computed (whitened data-space solve, active cells only)
-- [ ] MC validation gates passed
-- [ ] SBC coverage gate passed; realistic-body diagnostic figure added
+- [x] Closed-form posterior diagonal computed (data-space solve, active cells only) — 2026-07-31
+- [x] MC validation gates passed: N=30,000 Matheron samples vs closed form — median rel. err 0.55% (<2%), 95th pct 1.6% (<5%), 0.24% of cells beyond 3× MC standard error (≤1%)
+- [x] SBC coverage gate passed: 95.01% pooled coverage of the 95% interval over 20 prior-drawn-truth repetitions (realistic-body diagnostic deferred with the model comparison — blocked on the 2.55 bridge)
 - [ ] Provenance defense artifact added
 - [ ] Week-4 burn checkpoint: actual hours recorded, windows recomputed
 

@@ -1,0 +1,17 @@
+{
+ "mc": {
+  "n_samples": 30000,
+  "median_rel_err": 0.005470289463055484,
+  "p95_rel_err": 0.015999955046309133,
+  "frac_beyond_3se": 0.0023778856633310213,
+  "noise_floor_se": 0.008164965809277261
+ },
+ "mc_pass": true,
+ "coverage_pooled": 0.9500891707123749,
+ "coverage_pass": true,
+ "sigma_min": 0.020505341080536952,
+ "sigma_max": 8.640955002196359,
+ "informed_max": 0.12144081721059785,
+ "beta": 2191.245717888655,
+ "rms_mgal": 0.7599999999999992
+}
