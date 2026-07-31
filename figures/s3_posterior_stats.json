@@ -1,0 +1,30 @@
+{
+ "licensing_ood_pct": 0.0,
+ "sbc": {
+  "tail_frac": 0.05077551020408163,
+  "cover90": 0.8867755102040816,
+  "rounds": 250
+ },
+ "stability": {
+  "mean_gap_km": 0.6180381328523127,
+  "sd_ratio": 0.9891372327374992,
+  "stable": true
+ },
+ "posterior": {
+  "depth_sd_median_km": 7.1897916814427125,
+  "prior_sd_median_km": 12.67220772012723,
+  "shrinkage": 0.43386365348090905,
+  "drho_mean": 307.7592468261719,
+  "drho_sd": 61.320980072021484,
+  "median_abs_diff_vs_published_km": 4.252975666996056,
+  "pp_rms_dc_removed_mgal": 120.71515799263275,
+  "pp_rms_raw_mgal": 136.31237897919183,
+  "published_model_dc_removed_mgal": 19.3
+ },
+ "n_train": 50000,
+ "grid": [
+  41,
+  31
+ ],
+ "resolution_deg": 2.0
+}

@@ -1,0 +1,44 @@
+{
+ "ceiling_ladder": [
+  {
+   "label": "exact model\n(30,351 params)",
+   "n": 30351,
+   "rms": 19.287723514822282
+  },
+  {
+   "label": "48 RBF\n@7.0\u00b0",
+   "n": 48,
+   "rms": 62.272557959132314,
+   "depth_err_km": 3.089726910289915
+  },
+  {
+   "label": "130 RBF\n@4.0\u00b0",
+   "n": 130,
+   "rms": 43.501386724601794,
+   "depth_err_km": 2.3905845291267322
+  },
+  {
+   "label": "336 RBF\n@2.5\u00b0",
+   "n": 336,
+   "rms": 27.790274571947183,
+   "depth_err_km": 1.4757484981543676
+  },
+  {
+   "label": "744 RBF\n@1.6\u00b0",
+   "n": 744,
+   "rms": 21.547678748943106,
+   "depth_err_km": 0.764042469144999
+  }
+ ],
+ "exact_model_mgal": 19.287723514822282,
+ "our_class_ceiling_mgal": 62.272557959132314,
+ "our_posterior_mgal": 120.7,
+ "gates": {
+  "licensing": "PASS (0.0 pct)",
+  "sbc": "PASS (5.1/88.7)",
+  "stability": "PASS (0.62 km, sd ratio 0.989)",
+  "adequacy": "FAIL (120.7 vs 19.3 mGal)"
+ },
+ "verdict": "NO MOHO UNCERTAINTY MAP CLAIMED \u2014 model class inadequate",
+ "path_forward_coefficients": 744
+}

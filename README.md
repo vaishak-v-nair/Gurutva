@@ -64,7 +64,15 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
   - *Direct tesseroid forward* — 0.16 s (n=494) · 0.36 s (884) · 1.51 s (1938) · 3.96 s (3417). Passes only at coarse grids; 10⁵ simulations would cost **41.9 h**. (First timing read 37 s — that was numba compiling, not computing. Measured warm, per the house rule.)
   - *Layered-sensitivity route* (slice depth once, precompute each cell-layer response, then every forward is a matvec — the same trick Phase 1's `G` embodies): **50 min precompute, 721 MB, 27.2 ms per forward**, discretisation error **0.02 mGal** against a 3.6 mGal budget. 10⁵ simulations: **1.6 h**.
   - **Verdict: PROCEED** — 18× inside the speed budget, 180× inside the accuracy budget, 26× faster than direct. Two silent traps caught and pinned on the way: the published file is *latitude-first* (reading it lon-first relocates South America), and a deeper Moho is a *mass deficit* (first run gave corr −0.998 — right physics, wrong sign). `tests/test_moho.py` · `figures/s3_moho_spike.png`
-- [ ] S3 full: nonlinear Moho posterior on satellite data (the continent's first error bars) · E2: dark-matter twin
+- [x] **S3 FULL (2026-08-04) — three gates passed, no map claimed, and the gate suite gained a fourth member.** The satellite-gravity Moho inference ran end to end on GOCO5S data:
+  - *Gate 1, licensing* — **PASS**: the real observation sits at the **0.0th** OOD percentile (more typical than the median simulated continent). Contrast S2's 100th.
+  - *Gate 2, calibration* — **PASS**: SBC tails 5.1% (nominal 5), coverage 88.7% (nominal 90), 250 rounds.
+  - *Gate 3, stability* — **PASS**: two independently seeded networks (50k simulations each) agree on the continent's Moho to a median **0.62 km**, σ-ratio 0.989. This is the gate that killed S2's claim; here it holds.
+  - *Gate 4, posterior-predictive adequacy* — **FAIL, and decisive**: the posterior reproduces the observed gravity to only **120.7 mGal** (DC-removed) where the published model reaches **19.3**.
+  - **Why it failed, measured rather than guessed** — the ceiling test hands our own basis the *correct* published Moho: 48 RBF @7° can only reach **62.3 mGal**; 130 @4° → 43.5; 336 @2.5° → 27.8; 744 @1.6° → 21.5 vs the exact model's 19.3. So the declared 49-parameter class is inadequate *by construction*, and our inference (120.7) fell short even of its own 62.3 ceiling.
+  - **The methodological finding, now permanent:** licensing, calibration and stability are all *self-consistency* tests — an over-wide prior makes every observation look in-distribution (the mirror image of S2.5's too-narrow prior), SBC only tests coherence inside the model's own world, and two agreeing networks say nothing about either being right. **None of them test whether the model can reproduce reality.** Gate 4 now does, and is mandatory in `src/moho_infer.py`.
+  - **Verdict: no Moho uncertainty map is claimed.** Path forward is measured, not hoped: ~744 coefficients (15× the current class) to approach the exact model's fidelity. Pinned by `tests/test_s3_full.py` — `figures/s3_verdict.png`
+- [ ] S3 revisited at ~744 coefficients (the measured requirement) · E2: dark-matter twin
 
 ## Week-0 dataset verification note (2026-07-30)
 
