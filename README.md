@@ -59,7 +59,12 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
   - *Heterogeneity rejected on physics* — broad within-unit density variation "explains" 83.8% but only at 1.14–1.53 g/cc, **larger than the entire 0.23 g/cc basin-basement contrast**. Inflating it would have been fitting the prior to the misfit.
   - *The licensing test* — the real observation only becomes a plausible draw at a declared relief prior of σ_z ≳ 1200 m in a valley whose whole basin is 1–2 km deep. At physically defensible σ_z ≤ 300 m it sits beyond the 99.8th percentile.
   - **Verdict, recorded:** *simulation-based inference is not licensed at this observation for any physically defensible two-unit parametric class.* The interface question at this site is therefore answered by the Phase-1 closed-form posterior (which has no out-of-distribution failure mode), not by a neural one. Pinned by `tests/test_s25.py` — `figures/s25_diagnostic.png`
-- [ ] S3: Moho spike (kill-criterion attached) · E2: dark-matter twin
+- [x] **S3 SPIKE: PROCEED (2026-08-03) — the space debut is compute-feasible.** Target: the South American Moho from GOCO5S satellite gravity (Uieda & Barbosa 2017, CC-BY), whose published map carries **no uncertainty estimates of any kind**. The kill-criterion (≤0.5 s/forward; error <20% of the noise scale) was declared before measuring:
+  - *Yardstick*: forwarding the published Moho reproduces **98.5%** of the observed signal; residual scale 18.0 mGal → accuracy budget 3.6 mGal.
+  - *Direct tesseroid forward* — 0.16 s (n=494) · 0.36 s (884) · 1.51 s (1938) · 3.96 s (3417). Passes only at coarse grids; 10⁵ simulations would cost **41.9 h**. (First timing read 37 s — that was numba compiling, not computing. Measured warm, per the house rule.)
+  - *Layered-sensitivity route* (slice depth once, precompute each cell-layer response, then every forward is a matvec — the same trick Phase 1's `G` embodies): **50 min precompute, 721 MB, 27.2 ms per forward**, discretisation error **0.02 mGal** against a 3.6 mGal budget. 10⁵ simulations: **1.6 h**.
+  - **Verdict: PROCEED** — 18× inside the speed budget, 180× inside the accuracy budget, 26× faster than direct. Two silent traps caught and pinned on the way: the published file is *latitude-first* (reading it lon-first relocates South America), and a deeper Moho is a *mass deficit* (first run gave corr −0.998 — right physics, wrong sign). `tests/test_moho.py` · `figures/s3_moho_spike.png`
+- [ ] S3 full: nonlinear Moho posterior on satellite data (the continent's first error bars) · E2: dark-matter twin
 
 ## Week-0 dataset verification note (2026-07-30)
 
