@@ -1,0 +1,49 @@
+{
+ "nav_pos_km": 1.0,
+ "nav_vel_mms": 10.0,
+ "members": 600,
+ "regimes": [
+  {
+   "name": "benign transfer",
+   "days": 12,
+   "sigma_mc_km": 35.97967948312899,
+   "sigma_linear_km": 37.42747656932119,
+   "volume_ratio": 0.9545863884998895,
+   "min_lunar_km": 102618.67900566284
+  },
+  {
+   "name": "L1 lingering",
+   "days": 12,
+   "sigma_mc_km": 49.30381299305971,
+   "sigma_linear_km": 50.12413955272527,
+   "volume_ratio": 0.9465120668262338,
+   "min_lunar_km": 6428.50780812639
+  },
+  {
+   "name": "L1 lingering (20 d)",
+   "days": 20,
+   "sigma_mc_km": 101.77776708694533,
+   "sigma_linear_km": 103.47225608371613,
+   "volume_ratio": 1.035132672502135,
+   "min_lunar_km": 6428.50780812639
+  },
+  {
+   "name": "close lunar flyby",
+   "days": 12,
+   "sigma_mc_km": 10.841954006587676,
+   "sigma_linear_km": 10.528590128596427,
+   "volume_ratio": 0.9261386285004815,
+   "min_lunar_km": 3828.231165569419
+  },
+  {
+   "name": "deep lunar encounter",
+   "days": 10,
+   "sigma_mc_km": 97.57404336162121,
+   "sigma_linear_km": 96.40949153083511,
+   "volume_ratio": 1.342895121472086,
+   "min_lunar_km": 673.1079733401923
+  }
+ ],
+ "finding": "linearised covariance is adequate in most cislunar regimes at 1 km / 10 mm/s over 10-20 days; it under-reports only during deep lunar encounters",
+ "claim_not_made": "Gurutva does NOT claim standard astrodynamics tooling is broken \u2014 measured, and it mostly is not"
+}
