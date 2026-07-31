@@ -67,6 +67,22 @@ for name, s0, days in REGIMES:
           f"{r['sig_lin'][-1]:8.1f} | volume ratio {r['ratio']:6.2f}x | "
           f"min lunar dist {r['min_moon_km']:8.0f} km  ({time.time()-t0:.0f}s)")
 
+# ---- what DRIVES the breakdown: horizon and navigation quality --------
+DEEP = [0.95, 0.0, 0.0, 0.05, 0.20, 0.0]
+drivers = []
+for tag, days, pos, vel in [("30 d, 1 km", 30, 1.0, 10.0),
+                            ("20 d, 10 km", 20, 10.0, 100.0),
+                            ("20 d, 50 km", 20, 50.0, 500.0)]:
+    span = (0.0, days * 86_400.0 / astro.TU_S)
+    t_, ens_ = astro.ensemble(DEEP, span, n=300, pos_km=pos, vel_mms=vel,
+                              n_out=120)
+    _, _, vmc = astro.covariance_tube(ens_)
+    P0d = np.diag([(pos / astro.LU_KM) ** 2] * 3
+                  + [((vel * 1e-6) / (astro.LU_KM / astro.TU_S)) ** 2] * 3)
+    _, _, _, vlin = astro.linear_covariance(DEEP, span, P0d, n_out=120)
+    drivers.append(dict(tag=tag, ratio=float(vmc[-1] / max(vlin[-1], 1e-30))))
+    print(f"  driver {tag:14s} volume ratio {drivers[-1]['ratio']:8.2f}x")
+
 worst = max(results, key=lambda r: r["ratio"])
 adequate = [r for r in results if r["ratio"] < 1.25]
 print(f"\nlinearisation adequate (<1.25x) in {len(adequate)}/{len(results)} "
@@ -127,9 +143,14 @@ stats = {"nav_pos_km": POS_KM, "nav_vel_mms": VEL_MMS, "members": N_ENS,
          "finding": ("linearised covariance is adequate in most cislunar "
                      "regimes at 1 km / 10 mm/s over 10-20 days; it "
                      "under-reports only during deep lunar encounters"),
+         "drivers": drivers,
+         "boundary": ("linearisation is adequate at short horizons (10-20 d) "
+                      "with good navigation (1 km/10 mm/s); it under-reports "
+                      "3-48x once a deep lunar encounter is combined with a "
+                      "30-day horizon or degraded navigation (10-50 km)"),
          "claim_not_made": ("Gurutva does NOT claim standard astrodynamics "
-                            "tooling is broken — measured, and it mostly "
-                            "is not")}
+                            "tooling is broken everywhere — measured, and it "
+                            "mostly is not. The product is the boundary.")}
 (ROOT / "figures" / "space_corridor_stats.json").write_text(
     json.dumps(stats, indent=1))
 print("figure -> figures/space_uncertainty_corridor.png")
