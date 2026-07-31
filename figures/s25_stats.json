@@ -1,0 +1,76 @@
+{
+ "ladder": [
+  {
+   "label": "2-unit + 8 broad heterogeneity",
+   "pct": 95.38486169327423,
+   "rem": 7.076840471235544,
+   "w_med": 1764.122038809796,
+   "het_med": 1.5264765325915732,
+   "phys": "het |c| vs 0.02 g/cc prior"
+  },
+  {
+   "label": "interface 12 RBF @2.0 km",
+   "pct": 65.43503441334249,
+   "rem": 19.367122959399875,
+   "w_med": 4437.518395774755,
+   "het_med": null,
+   "phys": "\u00b1300 m"
+  },
+  {
+   "label": "interface 24 RBF @1.2 km",
+   "pct": 83.0539680613494,
+   "rem": 13.560667134332043,
+   "w_med": 982.0725591155119,
+   "het_med": null,
+   "phys": "\u00b1300 m"
+  },
+  {
+   "label": "interface 40 RBF @0.9 km",
+   "pct": 88.41607150036644,
+   "rem": 11.211790641252414,
+   "w_med": 488.2164825384273,
+   "het_med": null,
+   "phys": "\u00b1300 m"
+  }
+ ],
+ "ood_sweep": [
+  {
+   "sigma_z": 150.0,
+   "d_obs": 20.118979944797715,
+   "d_med": 7.950886308284014,
+   "pct": 100.0
+  },
+  {
+   "sigma_z": 300.0,
+   "d_obs": 16.061437630725674,
+   "d_med": 7.926643809070061,
+   "pct": 100.0
+  },
+  {
+   "sigma_z": 500.0,
+   "d_obs": 13.22345522855888,
+   "d_med": 7.884205317212266,
+   "pct": 100.0
+  },
+  {
+   "sigma_z": 800.0,
+   "d_obs": 10.951164990287607,
+   "d_med": 7.87982693546156,
+   "pct": 99.75
+  },
+  {
+   "sigma_z": 1200.0,
+   "d_obs": 9.526143736831418,
+   "d_med": 7.859274812739146,
+   "pct": 92.91666666666667
+  },
+  {
+   "sigma_z": 1800.0,
+   "d_obs": 8.496384211233527,
+   "d_med": 7.889119819817763,
+   "pct": 72.25
+  }
+ ],
+ "noise_floor": 8.0,
+ "verdict": "no physically-defensible 2-unit parametric class brings the real observation in-distribution; simulation-based inference is not licensed at this observation for this model class"
+}
