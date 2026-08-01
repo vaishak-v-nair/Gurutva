@@ -128,6 +128,15 @@ input[type=range]{width:100%;accent-color:var(--ink);height:28px}
 
 #start{padding:64px 0 40px;border-top:1px solid var(--line)}
 .who{max-width:62ch;margin-bottom:18px;font-size:19px}
+.how{margin-top:36px;border:1px solid var(--line);border-radius:8px;
+  padding:22px 26px;max-width:64ch}
+.how h3{font-family:var(--ui);font-size:12px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--mut);margin:0 0 12px}
+.how ol{margin:0;padding-left:22px;font-size:17px}
+.how li{margin-bottom:9px}
+.how code{background:var(--line);padding:2px 7px;border-radius:4px;
+  font-size:15px;font-family:var(--ui)}
+.how .whynot{margin:16px 0 0;font-size:15px;color:var(--mut)}
 .contact{margin-top:32px;font-family:var(--ui);font-size:17px;line-height:2}
 footer{border-top:1px solid var(--line);padding:22px 0 60px;
   font-family:var(--ui);font-size:12px;color:var(--mut);line-height:1.7}
@@ -369,6 +378,24 @@ def build():
   &mdash; before you fund it.</p>
   <p class="who"><b>You want to check the work.</b> {N_TESTS} passing tests,
   and the retractions are in there too. Ask and you get access.</p>
+
+  <div class="how">
+    <h3>How you actually use it</h3>
+    <ol>
+      <li>Double-click <code>Gurutva</code>. A window opens.</li>
+      <li>Choose your CSV &mdash; or press <b>Use the example</b> if you want
+        to watch it work first.</li>
+      <li>Answer three questions about your site. We do not guess them for
+        you: they are statements about your ground, not ours.</li>
+      <li>Press <b>Run</b>. About a minute later the report opens in your
+        browser, saved next to your data.</li>
+    </ol>
+    <p class="whynot">There is no sign-up, no upload, and no server. It runs
+    on your laptop and your data never leaves it. If a check fails it will
+    tell you so and refuse to give you a number &mdash; that is the product,
+    not a fault.</p>
+  </div>
+
   <p class="contact">
     <a href="mailto:vaishak.v.nair.dev@gmail.com">vaishak.v.nair.dev@gmail.com</a>
   </p>
