@@ -118,15 +118,16 @@ def exclusion_limit(mean, sd, k=1.96):
 def assess(suite, numbers=None, subject="this model"):
     """Turn a gate suite into the sentence the customer reads first."""
     numbers = numbers or {}
+    # Delegate to the suite rather than re-deriving the wording here. When the
+    # recovery gate was added, this function still said "all four gates pass"
+    # for a run whose fifth gate had failed — a headline drifting out of sync
+    # with the gates it summarises is exactly the failure mode this product
+    # sells against.
+    v = suite.verdict()
     if suite.claimable:
-        head = (f"CLAIMABLE — all four gates pass. The numbers below for "
-                f"{subject} are supported by the data.")
+        head = f"{v} The numbers below for {subject} are supported by the data."
     else:
-        failed = [g.name for g in suite.reports if not g.passed]
-        missing = 4 - len(suite.reports)
-        why = (f"{missing} gate(s) not run" if missing > 0
-               else f"failed: {', '.join(failed)}")
-        head = (f"NOT CLAIMED — {why}. Numbers below are DIAGNOSTIC ONLY and "
-                f"must not be used to support a decision about {subject}.")
+        head = (f"{v}. Numbers below are DIAGNOSTIC ONLY and must not be used "
+                f"to support a decision about {subject}.")
     return Verdict(suite.claimable, head,
                    [str(g) for g in suite.reports], numbers)

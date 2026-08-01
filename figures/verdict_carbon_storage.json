@@ -1,11 +1,12 @@
 {
  "claimable": true,
- "verdict": "CLAIMABLE \u2014 all four gates pass. The numbers below for this monitoring programme are supported by the data.",
+ "verdict": "CLAIMABLE \u2014 four core gates pass, and recovery verified against a known truth The numbers below for this monitoring programme are supported by the data.",
  "gates": [
   "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
   "[PASS] calibration(MC): 0.02091 (median < 0.100 (800-sample floor)) exact functional sd vs sampled",
   "[PASS] stability: 0 (< 1e-09) sd ratio 1.000",
-  "[PASS] adequacy: 0.001302 (0.001 < pp < 0.009) the only gate that tests reality"
+  "[PASS] adequacy: 0.001302 (0.001 < pp < 0.009) the only gate that tests reality",
+  "[PASS] recovery: 1 (cover >= 1.00 and worst miss <= 3 sigma) worst 0.3 sigma \u2014 the gate the other four cannot be"
  ],
  "numbers": {
   "CO2 accounted for inside the complex": "7.4 +/- 7.1 Mt   (declared injected: 10.0 Mt)",

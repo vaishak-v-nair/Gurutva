@@ -39,6 +39,16 @@ class GateReport:
 
 @dataclass
 class GateSuite:
+    """The four core gates, plus `recovery` whenever a truth is available.
+
+    `recovery` is not a fifth core gate, because it CANNOT always run: it
+    needs a known answer, and the whole point of an inversion is that you do
+    not have one. So the suite tracks it separately and the verdict states
+    plainly whether it was run. A claim that has never been checked against a
+    known truth is still a claim, but the reader is told so.
+    """
+
+    CORE = ("licensing", "calibration", "stability", "adequacy")
     reports: list = field(default_factory=list)
 
     def add(self, r: GateReport):
@@ -46,17 +56,38 @@ class GateSuite:
         print(str(r), flush=True)
         return r
 
+    def _core_hits(self):
+        # prefix match: "calibration(MC)" satisfies "calibration"
+        return {c: next((r for r in self.reports if r.name.startswith(c)), None)
+                for c in self.CORE}
+
+    @property
+    def recovery_report(self):
+        return next((r for r in self.reports if r.name.startswith("recovery")),
+                    None)
+
     @property
     def claimable(self) -> bool:
-        return len(self.reports) == 4 and all(r.passed for r in self.reports)
+        hits = self._core_hits()
+        if any(r is None or not r.passed for r in hits.values()):
+            return False
+        rec = self.recovery_report
+        return rec.passed if rec is not None else True
 
     def verdict(self) -> str:
-        if self.claimable:
-            return "CLAIMABLE — all four gates pass"
+        hits = self._core_hits()
+        missing = [c for c, r in hits.items() if r is None]
+        if missing:
+            return (f"INCOMPLETE — core gate(s) not run: {', '.join(missing)}")
         failed = [r.name for r in self.reports if not r.passed]
-        if len(self.reports) < 4:
-            return f"INCOMPLETE — only {len(self.reports)}/4 gates run"
-        return f"NOT CLAIMED — failed: {', '.join(failed)}"
+        if failed:
+            return f"NOT CLAIMED — failed: {', '.join(failed)}"
+        rec = self.recovery_report
+        if rec is None:
+            return ("CLAIMABLE — four core gates pass. RECOVERY UNTESTED: no "
+                    "known truth was available, so nothing here has been "
+                    "checked against a right answer.")
+        return "CLAIMABLE — four core gates pass, and recovery verified against a known truth"
 
 
 def licensing(x_obs, x_sim, max_percentile=95.0) -> GateReport:
@@ -133,3 +164,48 @@ def adequacy(pp_residual, reference_residual, factor=3.0) -> GateReport:
     return GateReport("adequacy", ok, pp_residual,
                       f"{lo:.3g} < pp < {hi:.3g}",
                       "the only gate that tests reality" + side)
+
+
+def recovery(est, sd, truth, k=1.96, min_cover=0.90,
+             max_miss_sigma=3.0) -> GateReport:
+    """DOES THE INTERVAL CONTAIN A KNOWN RIGHT ANSWER?
+
+    Born 2026-08-05 from the dark-matter run, which passed all four core
+    gates and then missed a truth we happened to know by 11.6 sigma. The
+    cause was prior shrinkage: the true peak was a 4-sigma excursion under
+    the declared prior, so the posterior pulled it toward zero and the
+    interval never covered it.
+
+    Why none of the four could catch that, structurally:
+      licensing   asks whether the DATA is plausible under the prior. It
+                  says nothing about whether the TRUTH is.
+      calibration (SBC) draws its test truths FROM the prior. A truth the
+                  prior cannot produce is outside its universe by
+                  construction, so coverage looks perfect while real
+                  coverage fails.
+      stability   two seeds agree on the same shrunken answer.
+      adequacy    a shrunken field still reproduces the data within noise,
+                  because the operator smooths.
+
+    So this gate exists, and it is deliberately NOT a fifth core gate: it
+    needs a known answer, and an inversion normally has none. Run it on
+    synthetic truths, on a withheld reference model, or on a benchmark —
+    and when you cannot run it, the suite says so out loud rather than
+    letting silence read as success.
+
+    est/sd/truth: arrays (a field) or scalars (a single functional).
+    Reports the fraction covered and the WORST miss in sigma, because a
+    field can cover 99% of cells and still be badly wrong where it matters.
+    """
+    est = np.atleast_1d(np.asarray(est, dtype=float))
+    sd = np.atleast_1d(np.asarray(sd, dtype=float))
+    truth = np.atleast_1d(np.asarray(truth, dtype=float))
+    miss = np.abs(est - truth) / np.where(sd > 0, sd, np.inf)
+    cover = float(np.mean(miss < k))
+    worst = float(np.max(miss))
+    ok = cover >= min_cover and worst <= max_miss_sigma
+    return GateReport("recovery", ok, cover,
+                      f"cover >= {min_cover:.2f} and worst miss <= "
+                      f"{max_miss_sigma:g} sigma",
+                      f"worst {worst:.1f} sigma — the gate the other four "
+                      f"cannot be")

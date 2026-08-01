@@ -18,7 +18,8 @@ OUT = ROOT / "web" / "index.html"
 geo = json.loads((FIG / "verdict_geothermal.json").read_text())
 ccs = json.loads((FIG / "verdict_carbon_storage.json").read_text())
 dm = json.loads((FIG / "verdict_dark_matter.json").read_text())
-REPO = "https://github.com/vaishak-v-nair/Gurutva"
+N_TESTS = 72          # keep in step with the suite
+REPO = "https://github.com/vaishak-v-nair/Gurutva"   # PRIVATE — do not link publicly
 
 
 def img(name):
@@ -121,7 +122,9 @@ h2{font-family:var(--ui);font-size:13px;letter-spacing:.09em;
 .proof h3{font-size:25px;margin:0 0 var(--s2);letter-spacing:-.01em}
 .proof .site{font-family:var(--ui);font-size:13px;color:var(--mut);
   margin-bottom:var(--s5)}
-.stamp{display:inline-block;font-family:var(--ui);font-size:12px;
+.stamp.warn{background:transparent;color:var(--mut);border-color:var(--line)}
+.stamp.no{background:var(--nobg);color:var(--no);border-color:var(--noline)}
+.stamp{display:inline-block;margin-right:var(--s2);font-family:var(--ui);font-size:12px;
   letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;
   border-radius:4px;background:var(--okbg);color:var(--ok);
   border:1px solid var(--okline);margin-bottom:var(--s4)}
@@ -249,7 +252,8 @@ HTML = f"""<style>{CSS}</style>
       <article class="proof">
         <h3>Should you drill here?</h3>
         <div class="site">Utah FORGE geothermal &middot; DOE GDR 1144 &middot; real data, CC-BY</div>
-        <div class="stamp">Claimable — 4 / 4 gates</div>
+        <div class="stamp">Claimable — 4 / 4 core gates</div>
+        <div class="stamp warn">Recovery untested — no known truth exists here</div>
         <p class="lead">The survey informs 30% of the model. Below
         {geo['z_blind_m']:,.0f}&nbsp;m elevation the typical cell is not
         constrained at all — that part of the picture is the regularizer, not rock.</p>
@@ -265,7 +269,8 @@ HTML = f"""<style>{CSS}</style>
       <article class="proof">
         <h3>Did the CO<sub>2</sub> stay in the box?</h3>
         <div class="site">Sleipner-class monitoring design &middot; seafloor gravimetry</div>
-        <div class="stamp">Claimable — 4 / 4 gates</div>
+        <div class="stamp">Claimable — 4 / 4 core gates</div>
+        <div class="stamp">Recovery verified — 0.3&sigma; from a known truth</div>
         <p class="lead">Inventory reconciles at
         {ccs['co2_inside_Mt']:.1f} &plusmn; {ccs['co2_inside_sd_Mt']:.1f}&nbsp;Mt
         against {ccs['injected_Mt']:.0f}&nbsp;Mt injected. A 400&nbsp;m leak
@@ -300,9 +305,10 @@ HTML = f"""<style>{CSS}</style>
 
     <div class="pair">
       <div>
-        <div class="metric">
+        <div class="stamp no">Not claimed — gate 5 failed</div>
+        <div class="metric" style="margin-top:var(--s4)">
           <div class="v num">{dm['peak_sigma']:.1f}&sigma;</div>
-          <div class="k">halo detected &middot; 4 / 4 gates pass</div>
+          <div class="k">halo detected &middot; 4 / 4 core gates pass</div>
         </div>
         <div class="metric">
           <div class="v num">&kappa; &lt; {dm['exclusion_kappa']:.3f}</div>
@@ -320,22 +326,26 @@ HTML = f"""<style>{CSS}</style>
     </div>
 
     <div class="selfcatch">
-      <div class="h">And then the product caught itself</div>
-      <p>All four gates passed — and the aperture-mass estimate still missed a
-      truth we happened to know by <strong>{dm['aperture_miss_sigma']:.1f}
-      sigma</strong>. The true peak is a
-      {dm['prior_excursion_sigma']:.1f}-sigma excursion under our own declared
-      prior, so the answer was shrunk {abs(dm['peak_bias_pct']):.0f}% toward
-      zero and the interval did not cover it.</p>
-      <p>No gate saw it. Licensing asks whether the <em>data</em> is
-      plausible, never the truth. Calibration draws its test truths from the
-      prior, so it is blind to this by construction. Two runs agreed on the
-      same shrunken answer, and a shrunken field still reproduces the shear.</p>
-      <p>So that number is published as diagnostic only and is not claimed.
-      The exclusion limit survives, because shrinkage makes an upper bound
-      conservative rather than optimistic. This is the same species of blind
-      spot that created the fourth gate, found the same way — by checking
-      against an answer we already knew.</p>
+      <div class="h">And then the product caught itself, so we built a fifth gate</div>
+      <p>All four core gates passed — and the map still missed a truth we
+      happened to know. Only <strong>{dm['recovery_cover'] * 100:.0f}% of
+      pixels</strong> had the right answer inside their 95% interval, worst
+      miss <strong>{dm['recovery_worst_sigma']:.1f} sigma</strong>.</p>
+      <p>None of the four could see it. Licensing asks whether the
+      <em>data</em> is plausible, never the truth. Calibration draws its test
+      truths <em>from</em> the prior, so it is blind by construction. Two runs
+      agree on the same wrong answer, and a smoothed field still reproduces
+      the shear. So gate 5 now exists: does the interval contain a known right
+      answer? It runs whenever a truth is available, and when none is, the
+      verdict says so out loud instead of letting silence read as success.</p>
+      <p>Gate 5 fails here, so this map is <strong>not claimed</strong>. We
+      widened the prior class first, and measured that it does not rescue it:
+      the aperture bias is shrinkage and widening helps, but the peak bias is
+      the lensing operator smoothing a cusp it cannot resolve, and no prior
+      undoes that. A prior wide enough to fix the aperture also degrades the
+      exclusion limit 2.2&times;. So the limit stays, the map does not, and
+      the CO<sub>2</sub> report above now carries gate 5 too — where it
+      passes at 0.3&sigma;.</p>
     </div>
   </div>
 </section>
@@ -404,19 +414,21 @@ HTML = f"""<style>{CSS}</style>
     <p class="who"><b>CO<sub>2</sub> storage operators.</b> Conformance and
     containment are filings, not opinions. Get a defensible statement of what
     your monitoring programme can and cannot prove — before you fund it.</p>
-    <p class="who"><b>Anyone who wants to check the work.</b> Every number here
-    is reproducible from a public repository with {68} passing tests. The
-    failures are in there too.</p>
+    <p class="who"><b>Anyone who wants to check the work.</b> Every number on
+    this page is generated by a script from a run that happened, and the
+    repository has {N_TESTS} passing tests. It is private today, pending
+    publication — ask and you get access, including the retractions.</p>
 
     <p class="contact">
       <a href="mailto:vaishak.v.nair.dev@gmail.com">vaishak.v.nair.dev@gmail.com</a><br>
-      <a href="{REPO}">{REPO.replace('https://', '')}</a>
+      <span style="color:var(--mut)">repository access on request</span>
     </p>
   </div>
 </section>
 
 <footer><div class="wrap">
   Gurutva &middot; Bayesian posterior uncertainty for potential-field inversion.
+  Repository private pending publication.
   Figures and numbers on this page are generated from
   <code>figures/verdict_geothermal.json</code> and
   <code>figures/verdict_carbon_storage.json</code> by <code>web/build.py</code> —

@@ -33,7 +33,7 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 
 ## Progress
 
-- [x] Day 1: repo public ([github.com/vaishak-v-nair/Gurutva](https://github.com/vaishak-v-nair/Gurutva)), environment pinned, this README up
+- [x] Day 1: repo created ([github.com/vaishak-v-nair/Gurutva](https://github.com/vaishak-v-nair/Gurutva)), environment pinned, this README up. **Visibility: PRIVATE** — verified 2026-08-05 by anonymous fetch (404). An earlier line here claimed it was public; it never was. Nothing in this project has been disclosed except the SimPEG forum post.
 - [x] Week 0: dataset verified — **Utah FORGE 3D gravity** (see the verification note below)
 - [x] Week 1: introduction posted on the SimPEG forum (2026-08-01)
 - [x] G-vs-analytic pytest passing (2026-07-29: SimPEG matches the analytic point mass to ~1e-8 relative; z-up sign convention established empirically — see `src/units_probe.py` and `tests/test_g_analytic.py`)

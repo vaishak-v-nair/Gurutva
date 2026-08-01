@@ -80,3 +80,49 @@ def test_verdict_refuses_when_a_gate_fails():
     assert not v.claimable
     assert "NOT CLAIMED" in v.headline and "DIAGNOSTIC ONLY" in v.headline
     assert "adequacy" in v.headline
+
+
+def test_recovery_gate_catches_what_the_other_four_cannot():
+    """The dark-matter failure, pinned: four core gates green, and an
+    interval that misses a known truth by 11 sigma."""
+    from src.gurutva_core import gates
+    r = gates.recovery(11.33, 0.74, 19.86)
+    assert not r.passed
+    suite = gates.GateSuite()
+    for n in ("licensing", "calibration(MC)", "stability", "adequacy"):
+        suite.reports.append(gates.GateReport(n, True, 1.0, "x"))
+    assert suite.claimable, "four core gates alone must still be claimable"
+    suite.reports.append(r)
+    assert not suite.claimable, "a failing recovery gate must block the claim"
+    assert "recovery" in suite.verdict()
+
+
+def test_untested_recovery_is_stated_not_implied():
+    """Silence must not read as success: with no truth available the verdict
+    has to SAY the claim was never checked against a right answer."""
+    from src.gurutva_core import gates
+    suite = gates.GateSuite()
+    for n in ("licensing", "calibration", "stability", "adequacy"):
+        suite.reports.append(gates.GateReport(n, True, 1.0, "x"))
+    assert suite.claimable
+    assert "RECOVERY UNTESTED" in suite.verdict()
+
+
+def test_core_gate_missing_is_incomplete_not_claimable():
+    from src.gurutva_core import gates
+    suite = gates.GateSuite()
+    for n in ("licensing", "calibration", "stability"):
+        suite.reports.append(gates.GateReport(n, True, 1.0, "x"))
+    assert not suite.claimable
+    assert "INCOMPLETE" in suite.verdict() and "adequacy" in suite.verdict()
+
+
+def test_recovery_reports_worst_miss_not_just_average():
+    """A field can cover 99% of cells and be badly wrong where it matters,
+    so the gate fails on the worst miss even when mean coverage is fine."""
+    import numpy as np
+    from src.gurutva_core import gates
+    est = np.zeros(200); sd = np.ones(200); truth = np.zeros(200)
+    truth[7] = 9.0                      # one cell catastrophically wrong
+    r = gates.recovery(est, sd, truth)
+    assert not r.passed and "9.0 sigma" in r.note

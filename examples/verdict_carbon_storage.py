@@ -110,6 +110,12 @@ print(f"  plume: peak saturation {sat.max():.2f}, signal "
       f"{np.abs(G @ truth).max() * 1e3:.1f} uGal peak, "
       f"S/N {np.std(G @ truth) / NOISE:.1f}")
 
+# gravity measures the MASS DEFICIT (CO2 replacing brine). CO2 tonnage is that
+# deficit scaled by rho_CO2 / (rho_brine - rho_CO2) — the standard conversion
+# used in Sleipner gravity interpretation.
+TO_CO2 = RHO_CO2 / (RHO_BRINE - RHO_CO2)
+MT = 1e-6                                    # g/cc * m^3 = t -> Mt
+
 # ------------------------------------------------------------------- gates
 prior, pmeta = PR.build_regular((nx, ny, nz), (dx, dy, dz), PRIOR_SD,
                                 CORR_LEN, rng)
@@ -143,12 +149,20 @@ sd_b, _ = PR.posterior_sd(Gw, prior, np.random.default_rng(77), N_POST)
 suite.add(gates.stability((mean, sd_post), (mean, sd_b), atol=1e-9))
 suite.add(gates.adequacy(RMS, NOISE))
 
+# GATE 5 (2026-08-05). This run declares its own plume, so a truth exists and
+# the gate MUST run — a synthetic study that declines to check itself against
+# the answer it planted is not a study. It is also run on the quantity the
+# report actually sells, the CO2 mass inside the complex, because per-cell
+# recovery and functional recovery fail for different reasons and a customer
+# acts on the functional.
+truth_in = float(np.where(inside_mask := (rad < COMPLEX_R), vol, 0.0)
+                 @ truth) * TO_CO2 * MT
+suite.add(gates.recovery(
+    abs(float(np.where(inside_mask, vol, 0.0) @ mean) * TO_CO2 * MT),
+    PR.functional_sd(Gw, prior, np.where(inside_mask, vol, 0.0)) * TO_CO2 * MT,
+    abs(truth_in), min_cover=1.0, max_miss_sigma=3.0))
+
 # --------------------------------------------- the regulator's three numbers
-# gravity measures the MASS DEFICIT (CO2 replacing brine). CO2 tonnage is
-# that deficit scaled by rho_CO2 / (rho_brine - rho_CO2) — the standard
-# conversion used in Sleipner gravity interpretation.
-TO_CO2 = RHO_CO2 / (RHO_BRINE - RHO_CO2)
-MT = 1e-6                                    # g/cc * m^3 = t -> Mt
 
 
 def co2_mass(mask):

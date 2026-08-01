@@ -39,13 +39,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 N, PIX = 24, 1.0                 # 24x24 sky patch
 SHAPE_NOISE = 0.03               # per-galaxy-pixel shear noise
-# Declared from what halos ARE: massive cluster-scale convergence runs
-# kappa ~ 0.1-0.5. The first E2 run declared 0.05, licensing refused it at
-# the 100th percentile, and the posterior peak came back biased low (0.35
-# against 0.597). It was re-declared from cluster physics, NOT widened until
-# the gate turned green. tests/test_lensing.py keeps the too-narrow prior as
-# a permanent failing case so that distinction cannot quietly erode.
-PRIOR_SD = 0.15
+# THE PRIOR CLASS, widened to contain what is being searched for.
+#
+# 0.30 is declared from the SEARCH CLASS, not from a gate: cluster-scale
+# convergence peaks at kappa ~0.1-0.6, and a prior must admit the largest
+# object it claims to be looking for at ~2 sigma. 0.6 / 2 = 0.30. The
+# earlier 0.15 admitted the true peak only as a 4-sigma excursion, which is
+# a prior that does not believe in the thing it is searching for.
+#
+# MEASURED (the sweep below, and why widening is NOT a cure-all):
+#   sd    lic%  cover  worst  apMiss  peak   excl
+#   0.15   0.0   0.33    5.1    11.6  0.458  0.037
+#   0.30   0.0   0.38    4.9     5.9  0.472  0.042
+#   0.60   0.0   0.51    4.1     3.0  0.475  0.056
+#   1.00   0.0   0.81    3.1     1.8  0.476  0.082
+#
+# Two different failures with two different causes, which the first pass at
+# this got wrong by blaming both on shrinkage:
+#   - the APERTURE miss really is prior shrinkage. Widening fixes it
+#     (11.6 -> 1.8 sigma).
+#   - the PEAK is not. At sd=1.0 the truth sits well inside the prior and
+#     the peak still returns 0.476 against 0.597. That is the lensing
+#     operator smoothing a cusp it cannot resolve at this pixel scale and
+#     noise. No prior can undo it.
+# And the cost is real: per-cell coverage never reaches 0.90 at any width,
+# while the exclusion limit degrades 2.2x from 0.037 to 0.082. So the prior
+# is declared from physics at 0.30 and the recovery gate is allowed to fail,
+# rather than widened to 1.0 to buy a green light at the price of the one
+# number that was actually trustworthy.
+PRIOR_SD = 0.30
 SEED = 20260805
 
 rng = np.random.default_rng(SEED)
@@ -84,6 +106,11 @@ suite.add(gates.stability((mean.ravel(), sd.ravel()),
 
 pp = float(np.sqrt(np.mean((K @ mean.ravel() - g_obs) ** 2)))
 suite.add(gates.adequacy(pp, SHAPE_NOISE))
+
+# GATE 5. This run is synthetic, so the truth is known and the gate CAN run.
+# It is expected to fail, and that is the point: the four core gates all pass
+# on a map whose per-cell values do not contain the right answer.
+suite.add(gates.recovery(mean.ravel(), sd.ravel(), truth.ravel()))
 
 # ---- the numbers, in both vocabularies at once ---------------------------
 peak = np.unravel_index(np.argmax(truth), truth.shape)
@@ -126,23 +153,32 @@ cover_sig = abs(ap_mean - ap_true) / ap_sd
 peak_bias = (mean[peak] - truth[peak]) / truth[peak] * 100
 prior_excursion = truth[peak] / PRIOR_SD
 
+rec = suite.recovery_report
 numbers = {
+    "THE ONE NUMBER THAT SURVIVES — 95% exclusion":
+        f"kappa < {excl:.3f} where nothing is detected. Every bias measured "
+        f"here pushes the estimate DOWN, which makes an upper limit "
+        f"conservative rather than optimistic. This is the quantity a search "
+        f"publishes, and it is the same array a mining report calls "
+        f"drill risk",
     "halo detected at": f"{sig:.1f} sigma "
-                        f"(peak kappa {mean[peak]:.3f} +/- {sd[peak]:.3f})",
-    "95% exclusion where nothing is seen":
-        f"kappa < {excl:.3f} — the most invisible mass that could be hiding "
-        f"in a pixel undetected. CLAIMABLE: shrinkage biases this DOWN, "
-        f"which makes an upper limit conservative, never optimistic",
+                        f"(peak kappa {mean[peak]:.3f} +/- {sd[peak]:.3f}) — "
+                        f"the DETECTION is solid; the VALUE is not",
     "pixels with a >2 sigma detection": f"{int(detected.sum())} of {N * N}",
-    "aperture mass inside 6 pixels — DIAGNOSTIC ONLY, DO NOT QUOTE":
-        f"{ap_mean:.2f} +/- {ap_sd:.2f} against a truth of {ap_true:.2f} — "
-        f"the interval misses by {cover_sig:.1f} sigma",
-    "why it misses, and why no gate caught it":
-        f"the true peak ({truth[peak]:.3f}) is a {prior_excursion:.1f}-sigma "
-        f"excursion under our own declared prior ({PRIOR_SD}), so the "
-        f"posterior shrinks it {abs(peak_bias):.0f}% toward zero. Licensing "
-        f"asks whether the DATA is plausible, not the truth. SBC draws its "
-        f"truths FROM the prior and is blind to this by construction",
+    "gate 5 (recovery) FAILED — and that is why nothing above is a map":
+        f"only {rec.value * 100:.0f}% of pixels have the truth inside their "
+        f"95% interval, worst miss "
+        f"{float(rec.note.split()[1]):.1f} sigma",
+    "peak value, DIAGNOSTIC ONLY":
+        f"{mean[peak]:.3f} against a truth of {truth[peak]:.3f} "
+        f"({abs(peak_bias):.0f}% low). Widening the prior does NOT fix this: "
+        f"at a prior of 1.0 the peak still returns 0.476. It is the lensing "
+        f"operator smoothing a cusp it cannot resolve, not shrinkage",
+    "aperture mass, DIAGNOSTIC ONLY":
+        f"{ap_mean:.2f} +/- {ap_sd:.2f} against a truth of {ap_true:.2f}, "
+        f"missing by {cover_sig:.1f} sigma. THIS one is shrinkage, and a "
+        f"prior of 1.0 would cut the miss to 1.8 sigma — at the price of "
+        f"degrading the exclusion limit 2.2x. Not taken",
 }
 v = V.assess(suite, numbers, subject="this dark-matter map")
 print("\n" + str(v))
@@ -185,8 +221,10 @@ report.render(
          "This is the premise the project was founded on, tested rather than "
          "asserted. It could have failed; the honest-negative clause was "
          "written before the run. It passed."),
-        ("The hole this run found in our own gate suite",
-         [("gates passed", "4 of 4"),
+        ("The hole this run found, and the gate that now catches it",
+         [("core gates passed", "4 of 4"),
+          ("gate 5, recovery", f"FAILED — {rec.value * 100:.0f}% coverage, "
+           f"worst miss {float(rec.note.split()[1]):.1f} sigma"),
           ("aperture mass vs known truth",
            f"misses by {cover_sig:.1f} sigma — interval does not cover"),
           ("true peak against the declared prior",
@@ -231,6 +269,8 @@ report.render(
     "peak_bias_pct": float(peak_bias),
     "prior_excursion_sigma": float(prior_excursion),
     "aperture_is_claimable": False,
+    "recovery_cover": float(rec.value),
+    "recovery_worst_sigma": float(rec.note.split()[1]),
     "n_pixels": N * N, "prior_sd": PRIOR_SD, "pp_residual": pp,
     "shape_noise": SHAPE_NOISE}, indent=1))
 print("\nreport -> figures/verdict_dark_matter.html")

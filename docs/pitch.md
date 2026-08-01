@@ -3,7 +3,7 @@
 One page. Plain sentences. Every number below is generated from a shipped run, not written by hand.
 
 Live page: https://claude.ai/code/artifact/08ef29a8-4ef9-4de0-918b-2d1d99bee296
-Code: https://github.com/vaishak-v-nair/Gurutva
+Code: private repository, access on request (pending publication)
 
 ---
 
@@ -23,7 +23,7 @@ Three things, on one page.
 2. **Pass or fail, on four checks.** Can my assumptions have produced this data? Are my error bars honest? Do I get the same answer twice? And does my answer reproduce the data it came from?
 3. **The one number you act on, with an interval.** How much mass is in this block. How much CO₂ could be outside the box. Not a point estimate — a range.
 
-## Two proofs, both public
+## Two proofs, both reproducible
 
 **Utah FORGE, real DOE gravity data.** All four checks pass. The survey constrains 30% of the model, and below 1,322 m elevation the typical cell is not constrained at all. Excess mass in a 2×2 km block: **−346 Mt, 95% between −484 and −207.** The standard workflow would have quoted that interval **2.6× too tight**.
 
@@ -50,7 +50,7 @@ Both were caught by our own gates, on our own work, before anyone else saw it.
 
 **If you run surveys** — give us one dataset and the model you already produced from it. We return the verdict report you saw above, on your data. No charge for the first one. If the answer is "your survey cannot support this decision," that is what you will get, and it is worth knowing before the drill moves.
 
-**If you work on this problem** — the repository is public and has 68 passing tests. The retractions are in there too: a headline we withdrew within four hours, a fix that failed on physical grounds, six separate times a threshold was set below its own sampling floor. Tear it apart. We would rather be corrected than agreed with.
+**If you work on this problem** — the repository has 72 passing tests and I will give you access. The retractions are in there too: a headline we withdrew within four hours, a fix that failed on physical grounds, six separate times a threshold was set below its own sampling floor. Tear it apart. We would rather be corrected than agreed with.
 
 ---
 

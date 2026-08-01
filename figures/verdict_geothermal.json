@@ -1,6 +1,6 @@
 {
  "claimable": true,
- "verdict": "CLAIMABLE \u2014 all four gates pass. The numbers below for the Utah FORGE density model are supported by the data.",
+ "verdict": "CLAIMABLE \u2014 four core gates pass. RECOVERY UNTESTED: no known truth was available, so nothing here has been checked against a right answer. The numbers below for the Utah FORGE density model are supported by the data.",
  "gates": [
   "[PASS] licensing: 5.333 (< 95.0 pct) observation must be plausible under the prior",
   "[PASS] calibration(MC): 0.02305 (median < 0.115 (4x the 600-sample floor)) exact functional sd vs sampled",
