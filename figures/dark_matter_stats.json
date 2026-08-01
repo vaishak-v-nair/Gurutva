@@ -1,0 +1,19 @@
+{
+ "grid": 24,
+ "shape_noise": 0.03,
+ "prior_sd": 0.15,
+ "peak_true": 0.5967733273542033,
+ "peak_mean": 0.4580500763508391,
+ "peak_sd": 0.030049038446154995,
+ "peak_significance": 15.243418759359674,
+ "pixels_detected_2sigma": 71,
+ "median_exclusion_kappa": 0.060098076892308255,
+ "gates": [
+  "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.01474 (median rel err < 2%) closed form vs sampling",
+  "[PASS] stability: 0 (< 1e-06) sd ratio 1.000",
+  "[PASS] adequacy: 0.02072 (< 3.0x0.03) the only gate that tests reality"
+ ],
+ "verdict": "CLAIMABLE \u2014 all four gates pass",
+ "P4": "CONFIRMED IN CODE: src/posterior.py, written for ore bodies, ran unmodified on weak-lensing shear \u2014 same linear operator signature, same posterior, same gate suite"
+}
