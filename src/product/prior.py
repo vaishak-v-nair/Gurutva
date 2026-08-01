@@ -1,0 +1,150 @@
+"""A prior that is actually a statement about rock.
+
+This module exists because a gate refused to let us ship without it.
+
+The product's headline number is "how much mass is in this box, plus or
+minus what". Its honesty rests entirely on the prior being a believable
+description of geology, and the two priors in common use are not:
+
+  1. beta from the discrepancy principle. Tuning the regularization weight
+     until the misfit hits a target implies, at Utah FORGE, that rock
+     density varies by 0.021 g/cc. Measured: licensing fails at the 100th
+     percentile — that prior could not have produced the anomaly that was
+     actually measured — and the reported error bar comes out ~9x too tight.
+
+  2. a flat, independent-per-cell prior at a physical amplitude (0.25 g/cc,
+     the published report's own basin contrast). Defensible per cell, and
+     still refused by licensing at the 99th percentile. Independent draws
+     are white noise: neighbouring cells cancel, so the long-wavelength
+     gravity that a real basin produces never appears. Rock is CORRELATED
+     over hundreds of metres; a diagonal prior cannot say so.
+
+So the prior here is Gaussian with a sparse PRECISION Q = A^T A assembled
+from SimPEG's own smallness + gradient operators (src/smoothness.py), which
+makes draws look like geology instead of like static. Two declared numbers:
+
+    PRIOR_SD_GCC   marginal density sd            (amplitude — what rock is)
+    CORR_LEN_M     smoothness/smallness ratio      (shape — how rock varies)
+
+Both are read off the site, never tuned until a gate turns green.
+
+What stays exact: the customer's number. For a linear functional w^T m,
+
+    var = w^T S w - (G S w)^T K^-1 (G S w),   S = Q^-1,  K = G S G^T + I
+
+needs only sparse solves against Q, so the mass interval is computed, not
+sampled. Per-cell maps are sampled (Matheron) and carry their MC error.
+"""
+
+import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
+
+
+class SmoothPrior:
+    """N(0, Q^-1) for sparse SPD Q, factorised once.
+
+    SciPy has no sparse Cholesky, so the factor for sampling is recovered
+    from SuperLU run in symmetric mode with pivoting disabled: there
+    U == D L^T, giving Q[ip][:,ip] = L D L^T with ip = argsort(perm_c).
+    That identity is CHECKED in __init__, not assumed — an unnoticed
+    permutation convention would silently produce samples from the wrong
+    distribution, and every gate downstream would still look green.
+    """
+
+    def __init__(self, Q, scale=1.0):
+        self.Q = (Q * scale).tocsc()
+        self._lu = spla.splu(self.Q, diag_pivot_thresh=0.0,
+                             permc_spec="MMD_AT_PLUS_A",
+                             options=dict(SymmetricMode=True))
+        self._ip = np.argsort(self._lu.perm_c)
+        self._Lt = self._lu.L.T.tocsr()
+        self._d = self._lu.U.diagonal()
+        if not np.array_equal(self._lu.perm_r, self._lu.perm_c):
+            raise RuntimeError("SuperLU pivoted despite symmetric mode — "
+                               "the sampling factor is not valid")
+        if self._d.min() <= 0:
+            raise RuntimeError("non-positive pivot — Q is not SPD")
+        gap = abs(self._lu.U - sp.diags(self._d) @ self._lu.L.T.tocsc()).max()
+        if gap > 1e-9 * abs(self.Q).max():
+            raise RuntimeError(f"U != D L^T (gap {gap:.3g}); refusing to "
+                               "sample from an unverified factor")
+
+    def apply_inv(self, b):
+        """S b = Q^-1 b, for one vector or a stack of columns."""
+        b = np.asarray(b, dtype=float)
+        if b.ndim == 1:
+            return self._lu.solve(b)
+        return np.column_stack([self._lu.solve(c) for c in b.T])
+
+    def sample(self, rng, n=1):
+        """Exact draws from N(0, Q^-1): solve L^T y = D^-1/2 xi, unpermute."""
+        z = rng.standard_normal((self.Q.shape[0], n)) / np.sqrt(self._d)[:, None]
+        y = spla.spsolve_triangular(self._Lt, z, lower=False)
+        x = np.empty_like(y)
+        x[self._ip] = y
+        return x
+
+    def marginal_sd(self, rng, n=400):
+        """Sampled marginal sd per cell (diag(Q^-1) has no cheap exact form)."""
+        return self.sample(rng, n).std(axis=1)
+
+
+def build(tree, active, prior_sd, corr_len_m, rng, n_calib=400,
+          alpha_s=1.0):
+    """Assemble the declared geological prior and calibrate its amplitude.
+
+    corr_len_m sets alpha_x/y/z = corr_len^2 * alpha_s, the standard
+    smallness-to-smoothness ratio: the prior's correlation length. The
+    overall scale is then fixed so the SAMPLED marginal sd equals prior_sd
+    — the amplitude is declared, and the assembly is made to honour it.
+    """
+    from ..smoothness import build_precision
+
+    Q0, _, _, _ = build_precision(tree, active, alpha_s=alpha_s,
+                                  alpha_x=corr_len_m**2 * alpha_s,
+                                  alpha_y=corr_len_m**2 * alpha_s,
+                                  alpha_z=corr_len_m**2 * alpha_s)
+
+    p0 = SmoothPrior(Q0)
+    sd0 = float(np.median(p0.marginal_sd(rng, n_calib)))
+    scale = (sd0 / prior_sd) ** 2          # Q -> Q*scale shrinks sd by sqrt
+    return SmoothPrior(Q0, scale), dict(
+        raw_median_sd=sd0, scale=scale, corr_len_m=corr_len_m,
+        declared_sd=prior_sd, n_calib=n_calib)
+
+
+# --------------------------------------------------------------- posterior
+def _kfactor(G, prior):
+    SGt = prior.apply_inv(G.T)                    # n x m
+    K = G @ SGt + np.eye(G.shape[0])
+    return SGt, K
+
+
+def posterior_mean(G, prior, d):
+    SGt, K = _kfactor(G, prior)
+    return SGt @ np.linalg.solve(K, d)
+
+
+def functional_sd(G, prior, w):
+    """Exact posterior sd of w^T m under the correlated prior."""
+    Sw = prior.apply_inv(np.asarray(w, float))
+    v = float(np.asarray(w) @ Sw)
+    GSw = G @ Sw
+    _, K = _kfactor(G, prior)
+    return np.sqrt(max(v - float(GSw @ np.linalg.solve(K, GSw)), 0.0))
+
+
+def posterior_sd(G, prior, rng, n=600):
+    """Per-cell sd by Matheron's rule. Returns (sd, mc_standard_error).
+
+    Sampled, not closed form: diag(Q^-1) has no cheap exact expression.
+    The MC error is returned rather than hidden, because a map whose error
+    bars are themselves uncertain must say so.
+    """
+    SGt, K = _kfactor(G, prior)
+    m = prior.sample(rng, n)                              # n_cells x n
+    eps = rng.standard_normal((G.shape[0], n))
+    fl = m - SGt @ np.linalg.solve(K, G @ m + eps)
+    sd = fl.std(axis=1)
+    return sd, sd / np.sqrt(2.0 * (n - 1))

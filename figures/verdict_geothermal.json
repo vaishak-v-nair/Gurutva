@@ -1,0 +1,35 @@
+{
+ "claimable": true,
+ "verdict": "CLAIMABLE \u2014 all four gates pass. The numbers below for the Utah FORGE density model are supported by the data.",
+ "gates": [
+  "[PASS] licensing: 5.333 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.02305 (median < 0.115 (4x the 600-sample floor)) exact functional sd vs sampled",
+  "[PASS] stability: 0 (< 1e-09) sd ratio 1.001",
+  "[PASS] adequacy: 0.5409 (0.253 < pp < 2.28) the only gate that tests reality"
+ ],
+ "numbers": {
+  "excess mass, 2x2 km box above the blind depth": "-346 Mt  (95%: -484 to -207 Mt)",
+  "is that a detection?": "YES \u2014 the interval excludes zero",
+  "the model is INVENTED below": "1,322 m elevation (1,044 m below the top of the mesh)",
+  "cells the survey actually informs (>5%)": "29.9% of 10,093",
+  "best-informed cell": "51% of its prior uncertainty removed"
+ },
+ "prior": {
+  "raw_median_sd": 3.787640075346608e-05,
+  "scale": 2.295394774459465e-08,
+  "corr_len_m": 500.0,
+  "declared_sd": 0.25,
+  "n_calib": 400
+ },
+ "prior_sd_gcc": 0.25,
+ "corr_len_m": 500.0,
+ "regional_order": 1,
+ "mass_Mt": -345.635757146878,
+ "mass_sd_Mt": 70.57183264813025,
+ "sd_standard_workflow_Mt": 26.71164477436114,
+ "overconfidence_factor": 2.641987539302252,
+ "z_blind_m": 1322.5,
+ "rms_mGal": 0.5408929071533064,
+ "floor_mGal": 0.76,
+ "residual_rms_mGal": 2.0334225960185375
+}

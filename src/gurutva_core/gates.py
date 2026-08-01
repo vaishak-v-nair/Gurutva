@@ -111,8 +111,25 @@ def adequacy(pp_residual, reference_residual, factor=3.0) -> GateReport:
 
     pp_residual: posterior-predictive misfit to the observation.
     reference_residual: what a credible model achieves on the same data.
+
+    TWO-SIDED since 2026-08-05, and the second side was forced by a
+    measurement, not by taste. S3 failed by MISSING the data (120.7 vs 19.3)
+    so the gate was born one-sided. Then Utah FORGE, run with a prior
+    declared from rock physics instead of from a tuned regularizer, came in
+    at 0.37 mGal against a MEASURED noise floor of 0.76 — beating the noise.
+    A model that explains the noise is not a better model; it has absorbed
+    it, and its error bars are then fiction in the opposite direction.
+    Both failures are inadequacy. The gate now says so.
     """
-    ok = pp_residual < factor * reference_residual
+    hi = factor * reference_residual
+    lo = reference_residual / factor
+    ok = lo < pp_residual < hi
+    if ok:
+        side = ""
+    elif pp_residual >= hi:
+        side = " — UNDERFITS: cannot reproduce the data"
+    else:
+        side = " — OVERFITS: has absorbed the noise floor"
     return GateReport("adequacy", ok, pp_residual,
-                      f"< {factor}x{reference_residual:g}",
-                      "the only gate that tests reality")
+                      f"{lo:.3g} < pp < {hi:.3g}",
+                      "the only gate that tests reality" + side)
