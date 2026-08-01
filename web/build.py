@@ -17,6 +17,7 @@ OUT = ROOT / "web" / "index.html"
 
 geo = json.loads((FIG / "verdict_geothermal.json").read_text())
 ccs = json.loads((FIG / "verdict_carbon_storage.json").read_text())
+dm = json.loads((FIG / "verdict_dark_matter.json").read_text())
 REPO = "https://github.com/vaishak-v-nair/Gurutva"
 
 
@@ -132,6 +133,26 @@ h2{font-family:var(--ui);font-size:13px;letter-spacing:.09em;
 .caveat{font-family:var(--ui);font-size:13px;color:var(--mut);
   line-height:1.5;padding-left:var(--s4);border-left:1px solid var(--line)}
 
+/* ---- 3b. the space section: one full-width composition ---- */
+#space{padding:var(--s9) 0;border-top:1px solid var(--line)}
+.space-lede{font-size:31px;line-height:1.3;letter-spacing:-.015em;
+  max-width:860px;text-wrap:balance;margin:0 0 var(--s5)}
+.space-sub{max-width:700px;color:var(--mut);font-size:20px;margin:0 0 var(--s6)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--s8);
+  align-items:start;margin-top:var(--s6)}
+.pair>*{min-width:0}
+.metric{margin-bottom:var(--s5)}
+.metric .v{font-size:39px;line-height:1.1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.metric .k{font-family:var(--ui);font-size:13px;color:var(--mut);
+  letter-spacing:.06em;text-transform:uppercase;margin-top:var(--s2)}
+.selfcatch{margin-top:var(--s7);max-width:860px;padding:var(--s5) var(--s6);
+  background:var(--nobg);border:1px solid var(--noline);border-radius:8px}
+.selfcatch .h{font-family:var(--ui);font-size:12px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--no);margin-bottom:var(--s3)}
+.selfcatch p{margin:0 0 var(--s3);font-size:19px}
+.selfcatch p:last-child{margin-bottom:0;color:var(--mut);font-size:17px}
+
 /* ---- 4. the gates ---- */
 #gates{padding:var(--s9) 0;border-top:1px solid var(--line)}
 .four{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s5)}
@@ -170,7 +191,9 @@ footer{border-top:1px solid var(--line);padding:var(--s5) 0 var(--s8);
 }
 @media (max-width:767px){
   body{font-size:17px}
-  .two{grid-template-columns:1fr;gap:var(--s7)}
+  .two,.pair{grid-template-columns:1fr;gap:var(--s7)}
+  .space-lede{font-size:25px}
+  .metric .v{font-size:31px}
   .four{grid-template-columns:1fr}
   .block{padding:var(--s5) var(--s5)}
   .block h1{font-size:27px}
@@ -258,6 +281,61 @@ HTML = f"""<style>{CSS}</style>
         here, in the code, and twice in the report.</p>
       </article>
 
+    </div>
+  </div>
+</section>
+
+<section id="space" aria-labelledby="sp-h">
+  <div class="wrap">
+    <h2 id="sp-h">The same code, ten thousand billion billion times further away</h2>
+    <p class="space-lede">The engine above was written for gravity stations in
+    a Utah desert. It was then run, without a single line changed, on the
+    weak-lensing shear of a dark-matter halo.</p>
+    <p class="space-sub">It works because both are the same problem: mass
+    inferred from the field it makes. Prisms&rarr;gravity and
+    mass-sheet&rarr;shear share an operator signature, so the engine does not
+    care what the mass is made of, or whether it is a kilometre down or
+    10<sup>22</sup>&nbsp;km away. The drilling interval and the exclusion
+    limit are one number with two names.</p>
+
+    <div class="pair">
+      <div>
+        <div class="metric">
+          <div class="v num">{dm['peak_sigma']:.1f}&sigma;</div>
+          <div class="k">halo detected &middot; 4 / 4 gates pass</div>
+        </div>
+        <div class="metric">
+          <div class="v num">&kappa; &lt; {dm['exclusion_kappa']:.3f}</div>
+          <div class="k">95% exclusion where nothing is seen</div>
+        </div>
+        <p style="color:var(--mut);max-width:34em">An exclusion limit is what a
+        physicist publishes when a search comes up empty. A posterior sigma is
+        what a mining company needs before drilling. They are the same array,
+        from the same function.</p>
+      </div>
+      <div class="scroller"><img src="{img('verdict_dark_matter.png')}"
+        alt="Four panels: the true dark-matter halo, the standard
+        Kaiser-Squires reconstruction with no error bars, the Gurutva
+        posterior mean, and the 95% exclusion limit on hidden mass."></div>
+    </div>
+
+    <div class="selfcatch">
+      <div class="h">And then the product caught itself</div>
+      <p>All four gates passed — and the aperture-mass estimate still missed a
+      truth we happened to know by <strong>{dm['aperture_miss_sigma']:.1f}
+      sigma</strong>. The true peak is a
+      {dm['prior_excursion_sigma']:.1f}-sigma excursion under our own declared
+      prior, so the answer was shrunk {abs(dm['peak_bias_pct']):.0f}% toward
+      zero and the interval did not cover it.</p>
+      <p>No gate saw it. Licensing asks whether the <em>data</em> is
+      plausible, never the truth. Calibration draws its test truths from the
+      prior, so it is blind to this by construction. Two runs agreed on the
+      same shrunken answer, and a shrunken field still reproduces the shear.</p>
+      <p>So that number is published as diagnostic only and is not claimed.
+      The exclusion limit survives, because shrinkage makes an upper bound
+      conservative rather than optimistic. This is the same species of blind
+      spot that created the fourth gate, found the same way — by checking
+      against an answer we already knew.</p>
     </div>
   </div>
 </section>

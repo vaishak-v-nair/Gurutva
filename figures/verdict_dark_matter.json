@@ -1,0 +1,34 @@
+{
+ "claimable": true,
+ "verdict": "CLAIMABLE \u2014 all four gates pass. The numbers below for this dark-matter map are supported by the data.",
+ "gates": [
+  "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.01052 (median rel err < 2%) closed form vs 8k Matheron samples",
+  "[PASS] stability: 0 (< 1e-06) sd ratio 1.000",
+  "[PASS] adequacy: 0.02072 (0.01 < pp < 0.09) the only gate that tests reality"
+ ],
+ "numbers": {
+  "halo detected at": "15.2 sigma (peak kappa 0.458 +/- 0.030)",
+  "95% exclusion where nothing is seen": "kappa < 0.037 \u2014 the most invisible mass that could be hiding in a pixel undetected. CLAIMABLE: shrinkage biases this DOWN, which makes an upper limit conservative, never optimistic",
+  "pixels with a >2 sigma detection": "71 of 576",
+  "aperture mass inside 6 pixels \u2014 DIAGNOSTIC ONLY, DO NOT QUOTE": "11.33 +/- 0.74 against a truth of 19.86 \u2014 the interval misses by 11.6 sigma",
+  "why it misses, and why no gate caught it": "the true peak (0.597) is a 4.0-sigma excursion under our own declared prior (0.15), so the posterior shrinks it 23% toward zero. Licensing asks whether the DATA is plausible, not the truth. SBC draws its truths FROM the prior and is blind to this by construction"
+ },
+ "peak_sigma": 15.243418759359674,
+ "peak_true": 0.5967733273542033,
+ "peak_mean": 0.4580500763508391,
+ "peak_sd": 0.030049038446154995,
+ "aperture_mean": 11.326039538413102,
+ "aperture_sd": 0.735240386187245,
+ "aperture_true": 19.85628983947244,
+ "exclusion_kappa": 0.03749055758191741,
+ "pixels_detected": 71,
+ "aperture_miss_sigma": 11.601988222239633,
+ "peak_bias_pct": -23.245551475699195,
+ "prior_excursion_sigma": 3.978488849028022,
+ "aperture_is_claimable": false,
+ "n_pixels": 576,
+ "prior_sd": 0.15,
+ "pp_residual": 0.020724984899116117,
+ "shape_noise": 0.03
+}
