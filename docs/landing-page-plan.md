@@ -196,31 +196,6 @@ Five-year horizon: the page must still be true after the product improves. Nothi
 
 - **The page scrolled sideways.** Grid children default to `min-width:auto`, so a 520px-wide figure refused to let its column shrink and pushed the whole body wide instead of scrolling inside its own container. Fixed with `.two>*{min-width:0}`. This is exactly the failure §6 said must never happen, and it happened anyway — reviewing the spec would never have found it.
 
-## GSTACK REVIEW REPORT
-
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run for this plan |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | not run |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | not run for this plan |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score: 6/10 → 9/10, 6 decisions |
-| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |
-
-Pass scores: Information architecture 6→9 · Interaction states 2→9 · User journey 3→9 · AI-slop risk 7→9 · Design system 4→9 · Responsive & accessibility 1→9 · Unresolved decisions 4 raised, 4 resolved.
-
-Hard rejections: none. All seven litmus checks pass — the first screen is the product's own output, so the brand is unmistakable and there is exactly one visual anchor.
-
-Two findings came from the rendered page rather than the spec, and both are recorded above: the body scrolled sideways because grid children default to `min-width:auto` (§16), and the light-only decision in §14 was overruled once the page was seen against a dark ground (§15.2).
-
-**VERDICT:** DESIGN CLEARED — plan at 9/10, page and pitch shipped and committed at `8df5e4a`. Eng review not run for this plan; it is a static page with no application code, so the required gate applies to `src/` rather than to `web/`.
-
-NO UNRESOLVED DECISIONS
-
----
-
-# Verdict report — design review (2026-08-05, second pass)
-
-Target: the document `gurutva report` / `gurutva selftest` produces — the artifact a paying customer opens after running the tool. Never design-reviewed before; written fast as a way to display numbers.
 
 ## Ratings
 
@@ -256,3 +231,22 @@ Target: the document `gurutva report` / `gurutva selftest` produces — the arti
 - **Multi-page / paginated layout.** One page is the product.
 - **Charts beyond the section view.** A plan view and a depth profile were considered and cut: the section already carries the blind-depth line, which is the point.
 
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run for this plan |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | not run |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | not run for this plan |
+| Design Review | `/plan-design-review` | UI/UX gaps | 2 | CLEAR (FULL) | pass 1 landing page 6/10 → 9/10, 6 decisions · pass 2 verdict report 4/10 → 9/10, 1 decision |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |
+
+Pass 2 (verdict report, the artifact a paying customer opens): Information architecture 4→9 · Interaction states 5→8 · User journey 4→9 · AI-slop risk 8→9 · Design system 7→9 · Responsive & accessibility 3→8 · Unresolved decisions 1 raised, 1 resolved (D2-A, the PROVISIONAL state).
+
+Two findings were defects rather than design gaps, and both were found by reading the rendered output rather than the source: the footer advertised a per-cell map that was never rendered, and gate thresholds containing `<` were parsed as tags so the browser silently ate the rest of each row.
+
+Three tests asserted the old two-state wording. They were updated to the new contract rather than the contract bent back to fit them.
+
+**VERDICT:** DESIGN CLEARED — both customer-facing artifacts reviewed and at 9/10. Eng review still not run for this plan; it covers `src/`, and the CLI and report layer it now touches are exercised by 21 CLI and product tests.
+
+NO UNRESOLVED DECISIONS
