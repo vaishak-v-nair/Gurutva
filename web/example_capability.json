@@ -1,0 +1,34 @@
+{
+ "mode": "selftest",
+ "survey": "examples/demo_survey.csv",
+ "claimable": true,
+ "verdict": "CLAIMABLE \u2014 all four core gates pass AND the result was checked against a known right answer. The numbers below describe this survey design.",
+ "gates": [
+  "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.02357 (median < 0.115 (600-sample floor)) exact functional sd vs sampled",
+  "[PASS] stability: 0 (< 1e-09) sd ratio 1.000",
+  "[PASS] adequacy: 0.005902 (0.00447 < pp < 0.0402) the only gate that tests reality",
+  "[PASS] recovery: 0.9941 (cover >= 0.90 and worst miss <= 4.65 sigma (n=3,570)) worst 3.2 sigma \u2014 the gate the other four cannot be"
+ ],
+ "numbers": {
+  "CAN YOUR SURVEY SEE IT?": "YES \u2014 the planted body is recovered inside its interval",
+  "recovery": "99% of cells cover the truth, worst miss 3.2 sigma",
+  "planted body": "-0.3 g/cc, radius 300 m, 900 m deep",
+  "excess mass, 2x2 km block above the blind depth": "-12.6 Mt  (95%: -44.4 to +19.3 Mt)",
+  "is that a detection?": "NO \u2014 consistent with zero. 95% upper limit 44.4 Mt",
+  "your model is INVENTED below": "1,307 m elevation (237 m below the top of the mesh) \u2014 deeper than this, the typical cell is the prior, not your data",
+  "cells your survey informs (>5%)": "29.8% of 3,570",
+  "per-cell shortcut would have said": "+/-8.6 Mt instead of +/-16.3 Mt (1.90x) \u2014 neighbouring cells trade off, so the variance of a sum is not the sum of variances"
+ },
+ "declared": {
+  "noise": 0.05,
+  "prior_sd": 0.1,
+  "corr_len": 400.0,
+  "cell": 200.0,
+  "depth": 2000.0
+ },
+ "mass_Mt": -12.570792333618108,
+ "mass_sd_Mt": 16.26145759042728,
+ "z_blind_m": 1306.556894736842,
+ "rms": 0.005902396899600368
+}

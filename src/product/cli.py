@@ -43,6 +43,9 @@ import json
 import sys
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -50,6 +53,23 @@ from src import prism_forward as pf
 from src.gurutva_core import gates
 from src.product import prior as PR, report, verdict as V
 
+from scipy.spatial import cKDTree as _KD
+
+
+def _version():
+    """Stamp the report with the commit it came from. An auditable document
+    that cannot say which code produced it is not auditable."""
+    import subprocess
+    try:
+        h = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                           cwd=Path(__file__).resolve().parents[2],
+                           capture_output=True, text=True, timeout=5)
+        return f"gurutva {h.stdout.strip()}" if h.returncode == 0 else "gurutva"
+    except Exception:
+        return "gurutva"
+
+
+_VERSION = _version()
 MAX_CELLS = 60_000       # laptop guard; refuse rather than swap for an hour
 
 
@@ -294,13 +314,59 @@ def run(args):
                           else Path(args.survey).name))
     print("\n" + str(v))
 
+    # THE FIGURE. The footer used to promise "per-cell map from N posterior
+    # samples" and no map was ever drawn — the arrays were computed and thrown
+    # away. A customer was told about a picture they were never shown.
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.2), dpi=140)
+    cy_ = stations[:, 1].mean()
+    kd = _KD(centers)
+    xg = np.linspace(centers[:, 0].min(), centers[:, 0].max(), 200)
+    zg = np.linspace(centers[:, 2].min(), centers[:, 2].max(), 120)
+    XX, ZZ = np.meshgrid(xg, zg)
+    dist, idx = kd.query(np.column_stack(
+        [XX.ravel(), np.full(XX.size, cy_), ZZ.ravel()]))
+    outside = (dist > args.cell * 1.5).reshape(XX.shape)
+    for ax, val, ttl, cm, kw in [
+        (axes[0], sd, "how uncertain each cell still is (g/cc)", "viridis", {}),
+        (axes[1], inf, "informed fraction: 1 = your data knows it, "
+         "0 = it is your prior talking", "magma",
+         dict(vmin=0, vmax=max(0.2, float(np.nanmax(inf))))),
+    ]:
+        Z = np.where(outside, np.nan, np.asarray(val)[idx].reshape(XX.shape))
+        im = ax.pcolormesh(xg / 1000, zg, Z, cmap=cm, shading="auto", **kw)
+        fig.colorbar(im, ax=ax, fraction=0.046)
+        ax.axhline(z_blind, color="r", lw=1.3, ls="--")
+        ax.set_title(ttl, fontsize=9)
+        ax.set_xlabel("easting (km)")
+    axes[0].set_ylabel("elevation (m)")
+    fig.tight_layout()
     out = Path(args.out)
+    figpath = out.with_suffix(".png")
+    fig.savefig(figpath)
+    plt.close(fig)
+
     report.render(
         out,
         "Gurutva — survey capability" if truth is not None else "Gurutva — model verdict",
         f"{Path(args.survey).name} · {len(stations)} stations · "
         f"{args.noise:g} mGal declared noise",
-        v,
+        v, figure=figpath,
+        caption=(f"Section through the model at the centre of your survey. "
+                 f"Below the red line ({z_blind:,.0f} m elevation) the typical "
+                 f"cell is unconstrained: that part of any map you have been "
+                 f"shown is the regularizer, not the rock."),
+        headline=((f"{m_box * MT:+,.1f} Mt"),
+                  (f"excess mass in the {args.region / 1000:g} km block at the "
+                   f"centre of your survey, above the blind depth. "
+                   f"95% between {(m_box - 1.96 * sd_box) * MT:+,.1f} and "
+                   f"{(m_box + 1.96 * sd_box) * MT:+,.1f} Mt."))
+        if truth is None else
+        ((f"{'YES' if suite.recovery_report.passed else 'NO'}"),
+         (f"can this survey see a {args.body_radius:g} m body at "
+          f"{args.body_depth:g} m depth? "
+          f"{suite.recovery_report.value * 100:.0f}% of cells recover the "
+          f"planted truth inside their interval.")),
+        version=_VERSION,
         sections=[("What you declared",
                    [("noise floor", f"{args.noise:g} mGal — YOUR measurement, "
                      "not our guess"),

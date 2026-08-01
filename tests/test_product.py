@@ -97,15 +97,20 @@ def test_recovery_gate_catches_what_the_other_four_cannot():
     assert "recovery" in suite.verdict()
 
 
-def test_untested_recovery_is_stated_not_implied():
-    """Silence must not read as success: with no truth available the verdict
-    has to SAY the claim was never checked against a right answer."""
+def test_untested_recovery_is_a_distinct_verdict_state():
+    """Three genuinely different situations get three different words, so the
+    headline can never say CLAIMABLE and 'nothing was checked' at once."""
     from src.gurutva_core import gates
     suite = gates.GateSuite()
     for n in ("licensing", "calibration", "stability", "adequacy"):
         suite.reports.append(gates.GateReport(n, True, 1.0, "x"))
     assert suite.claimable
-    assert "RECOVERY UNTESTED" in suite.verdict()
+    assert suite.status == "PROVISIONAL"
+    assert "PROVISIONAL" in suite.verdict()
+    suite.reports.append(gates.recovery(0.0, 1.0, 0.1))
+    assert suite.status == "CLAIMABLE"
+    suite.reports.append(gates.GateReport("adequacy2", False, 9.0, "x"))
+    assert suite.status == "NOT CLAIMED"
 
 
 def test_core_gate_missing_is_incomplete_not_claimable():

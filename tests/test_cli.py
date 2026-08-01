@@ -63,7 +63,7 @@ def test_report_mode_produces_a_report(tmp_path):
     assert out.with_suffix(".json").exists()
     html = out.read_text(encoding="utf-8")
     assert "excess mass" in html
-    assert "CLAIMABLE" in html or "NOT CLAIMED" in html
+    assert any(w in html for w in ("CLAIMABLE", "PROVISIONAL", "NOT CLAIMED"))
 
 
 def test_selftest_actually_runs_the_recovery_gate(tmp_path):
@@ -74,17 +74,23 @@ def test_selftest_actually_runs_the_recovery_gate(tmp_path):
                 "--out", str(out)])
     html = out.read_text(encoding="utf-8")
     assert "recovery" in html
-    assert "RECOVERY UNTESTED" not in html, "selftest must actually test it"
+    assert "PROVISIONAL" not in html, "selftest checks a truth, so not provisional"
 
 
-def test_report_mode_states_that_recovery_was_untested(tmp_path):
-    """Silence must never read as success on real data."""
+def test_report_mode_says_PROVISIONAL_not_CLAIMABLE(tmp_path):
+    """Silence must never read as success on real data.
+
+    The old wording printed the green word CLAIMABLE and then, in the same
+    breath, 'nothing here has been checked against a right answer'. A reader
+    who scans stops at the green word. Real data can never run gate 5, so
+    this is the normal case, not an edge case."""
     out = tmp_path / "r2.html"
     cli.main(["report", "--survey", _survey(tmp_path)] + BASE
              + ["--out", str(out)])
     html = out.read_text(encoding="utf-8")
     if "NOT CLAIMED" not in html:
-        assert "RECOVERY UNTESTED" in html
+        assert "PROVISIONAL" in html
+        assert "class='word'>CLAIMABLE<" not in html
 
 
 # ------------------------------------------------------- refusals at the door
@@ -204,3 +210,41 @@ def test_duplicate_stations_are_warned_about(tmp_path, capsys):
     p = _write(tmp_path, "dup.csv", "x,y,z,gz", rows + rows[:6])
     cli.main(["report", "--survey", p] + BASE + ["--out", str(tmp_path / "d.html")])
     assert "repeat an existing" in capsys.readouterr().out
+
+
+def test_the_report_shows_the_figure_it_promises(tmp_path):
+    """The footer advertised 'per-cell map from N posterior samples' while no
+    map was ever rendered: the arrays were computed and thrown away."""
+    out = tmp_path / "f.html"
+    cli.main(["report", "--survey", _survey(tmp_path)] + BASE
+             + ["--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    assert "data:image/png;base64" in html, "the promised map must exist"
+    assert out.with_suffix(".png").exists()
+
+
+def test_gate_details_survive_html_escaping(tmp_path):
+    """Gate thresholds contain '<' ('median < 0.115'), which a browser reads
+    as a tag and silently eats the rest of the row."""
+    out = tmp_path / "e.html"
+    cli.main(["report", "--survey", _survey(tmp_path)] + BASE
+             + ["--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    import re
+    details = re.findall(r"<span class='detail'>(.*?)</span>", html, re.S)
+    assert len(details) == 4, "one detail line per core gate"
+    assert any("&lt;" in d for d in details), "'<' must be escaped, not eaten"
+    assert all("pct" in d or "floor" in d or "ratio" in d or "pp" in d
+               for d in details), "no row may be truncated"
+
+
+def test_the_report_is_dated_and_versioned(tmp_path):
+    """It goes into a meeting where money is decided."""
+    out = tmp_path / "v.html"
+    cli.main(["report", "--survey", _survey(tmp_path)] + BASE
+             + ["--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    import re
+    assert re.search(r"\d{4}-\d{2}-\d{2}", html), "must carry a date"
+    assert "gurutva" in html, "must say which code produced it"
+    assert "@media print" in html, "it will be printed"

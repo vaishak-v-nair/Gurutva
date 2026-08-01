@@ -74,20 +74,39 @@ class GateSuite:
         rec = self.recovery_report
         return rec.passed if rec is not None else True
 
-    def verdict(self) -> str:
+    @property
+    def status(self) -> str:
+        """One of INCOMPLETE / NOT CLAIMED / PROVISIONAL / CLAIMABLE.
+
+        PROVISIONAL exists because the old two-state wording argued with
+        itself: a real-data run printed the green word CLAIMABLE and then, in
+        the same breath, "nothing here has been checked against a right
+        answer". A reader who scans stops at the green word. Three genuinely
+        different situations now get three different words, and CLAIMABLE
+        goes back to meaning something strong and rare.
+        """
         hits = self._core_hits()
-        missing = [c for c, r in hits.items() if r is None]
-        if missing:
-            return (f"INCOMPLETE — core gate(s) not run: {', '.join(missing)}")
-        failed = [r.name for r in self.reports if not r.passed]
-        if failed:
+        if any(r is None for r in hits.values()):
+            return "INCOMPLETE"
+        if any(not r.passed for r in self.reports):
+            return "NOT CLAIMED"
+        return "CLAIMABLE" if self.recovery_report is not None else "PROVISIONAL"
+
+    def verdict(self) -> str:
+        st = self.status
+        if st == "INCOMPLETE":
+            missing = [c for c, r in self._core_hits().items() if r is None]
+            return f"INCOMPLETE — core gate(s) not run: {', '.join(missing)}"
+        if st == "NOT CLAIMED":
+            failed = [r.name for r in self.reports if not r.passed]
             return f"NOT CLAIMED — failed: {', '.join(failed)}"
-        rec = self.recovery_report
-        if rec is None:
-            return ("CLAIMABLE — four core gates pass. RECOVERY UNTESTED: no "
-                    "known truth was available, so nothing here has been "
-                    "checked against a right answer.")
-        return "CLAIMABLE — four core gates pass, and recovery verified against a known truth"
+        if st == "PROVISIONAL":
+            return ("PROVISIONAL — all four core gates pass, but nothing here "
+                    "has been checked against a known right answer. Real data "
+                    "has none. Run a self-test on this survey design to find "
+                    "out what it can actually recover.")
+        return ("CLAIMABLE — all four core gates pass AND the result was "
+                "checked against a known right answer.")
 
 
 def licensing(x_obs, x_sim, max_percentile=95.0) -> GateReport:

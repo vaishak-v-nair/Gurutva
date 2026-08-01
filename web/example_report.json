@@ -2,7 +2,7 @@
  "mode": "report",
  "survey": "examples/demo_survey.csv",
  "claimable": true,
- "verdict": "CLAIMABLE \u2014 four core gates pass. RECOVERY UNTESTED: no known truth was available, so nothing here has been checked against a right answer. The numbers below for demo_survey.csv are supported by the data.",
+ "verdict": "PROVISIONAL \u2014 all four core gates pass, but nothing here has been checked against a known right answer. Real data has none. Run a self-test on this survey design to find out what it can actually recover. The numbers below describe demo_survey.csv.",
  "gates": [
   "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
   "[PASS] calibration(MC): 0.01338 (median < 0.115 (600-sample floor)) exact functional sd vs sampled",

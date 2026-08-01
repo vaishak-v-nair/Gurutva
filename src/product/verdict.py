@@ -39,6 +39,7 @@ class Verdict:
     """What the customer receives. Deliberately small and quotable."""
     claimable: bool
     headline: str
+    status: str = "CLAIMABLE"
     gates: list = field(default_factory=list)
     numbers: dict = field(default_factory=dict)
 
@@ -123,11 +124,11 @@ def assess(suite, numbers=None, subject="this model"):
     # for a run whose fifth gate had failed — a headline drifting out of sync
     # with the gates it summarises is exactly the failure mode this product
     # sells against.
-    v = suite.verdict()
-    if suite.claimable:
-        head = f"{v} The numbers below for {subject} are supported by the data."
+    v, st = suite.verdict(), suite.status
+    if st in ("CLAIMABLE", "PROVISIONAL"):
+        head = f"{v} The numbers below describe {subject}."
     else:
         head = (f"{v}. Numbers below are DIAGNOSTIC ONLY and must not be used "
                 f"to support a decision about {subject}.")
-    return Verdict(suite.claimable, head,
+    return Verdict(suite.claimable, head, st,
                    [str(g) for g in suite.reports], numbers)

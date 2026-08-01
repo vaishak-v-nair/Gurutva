@@ -215,3 +215,44 @@ Two findings came from the rendered page rather than the spec, and both are reco
 **VERDICT:** DESIGN CLEARED — plan at 9/10, page and pitch shipped and committed at `8df5e4a`. Eng review not run for this plan; it is a static page with no application code, so the required gate applies to `src/` rather than to `web/`.
 
 NO UNRESOLVED DECISIONS
+
+---
+
+# Verdict report — design review (2026-08-05, second pass)
+
+Target: the document `gurutva report` / `gurutva selftest` produces — the artifact a paying customer opens after running the tool. Never design-reviewed before; written fast as a way to display numbers.
+
+## Ratings
+
+| Pass | Before | After |
+|---|---|---|
+| 1 Information architecture | 4 | 9 |
+| 2 Interaction states | 5 | 8 |
+| 3 User journey | 4 | 9 |
+| 4 AI-slop risk | 8 | 9 |
+| 5 Design system | 7 | 9 |
+| 6 Responsive + accessibility | 3 | 8 |
+| 7 Unresolved decisions | 1 raised | 1 resolved |
+
+## What was wrong, and what changed
+
+1. **The footer promised a map that was never rendered.** "per-cell map from 600 posterior samples" — the CLI computed the sigma and informed-fraction arrays and threw them away. Not a design flaw, a defect: a customer was told about a picture they were never shown. Now a two-panel section is generated and embedded.
+
+2. **The verdict argued with itself.** A real-data run printed the green word CLAIMABLE and then, in the same breath, "nothing here has been checked against a right answer." A reader who scans stops at the green word. Real data can never run gate 5, so this was the normal case, not an edge case. Resolved by D2-A: a third state, **PROVISIONAL** (amber), sitting between NOT CLAIMED and CLAIMABLE. CLAIMABLE now means gates 1–5, which makes it strong and rare, and gives the customer a next step — run a self-test to earn it.
+
+3. **The gate table was debug output.** `0.01338 (median < 0.115 (600-sample floor)) exact functional sd vs sampled`. Each row now leads with the plain-English question that gate asks; the machine detail sits underneath in 11.5px muted type for whoever wants it.
+
+4. **The number the decision turns on was a table cell.** It is now 46px between two rules, with its interval as the caption — the same treatment §2 of the landing page gets.
+
+5. **No date, no version.** On a document destined for a meeting where money is decided. Both now stamped top-right; the version is the actual short commit hash.
+
+6. **No print stylesheet** on the one artifact people definitely print. Added, with `break-inside: avoid` on tables, figures and the headline, and colour preserved on the verdict block.
+
+7. **Gate thresholds contain `<`.** `(median < 0.115` — the browser read it as a tag and silently ate the rest of the row. Found by reading the rendered page, not the source. Machine-generated detail is now escaped; author-written section notes are not, because those intentionally carry markup.
+
+## NOT in scope
+
+- **Dark mode for the report.** It is a printable document with one committed look. The landing page answers for both because it is read on screen; this is not.
+- **Multi-page / paginated layout.** One page is the product.
+- **Charts beyond the section view.** A plan view and a depth profile were considered and cut: the section already carries the blind-depth line, which is the point.
+
