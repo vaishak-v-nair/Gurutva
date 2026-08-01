@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.product import cli
+from src.product import cli, survey as SV
 
 BASE = ["--noise", "0.02", "--prior-sd", "0.1", "--corr-len", "400",
         "--cell", "300", "--depth", "900", "--samples", "120"]
@@ -248,3 +248,142 @@ def test_the_report_is_dated_and_versioned(tmp_path):
     assert re.search(r"\d{4}-\d{2}-\d{2}", html), "must carry a date"
     assert "gurutva" in html, "must say which code produced it"
     assert "@media print" in html, "it will be printed"
+
+
+# ---------------------------------- magnetics, geography, terrain, lease blocks
+def _grid_xyz(n_x=8, n_y=6, spacing=250.0):
+    gx, gy = np.meshgrid(np.arange(n_x) * spacing, np.arange(n_y) * spacing,
+                         indexing="ij")
+    return gx.ravel() + 331000, gy.ravel() + 4263000
+
+
+def _write_rows(tmp_path, name, header, cols, fmt="%.6f"):
+    p = tmp_path / name
+    np.savetxt(p, np.column_stack(cols), delimiter=",", header=header,
+               comments="", fmt=fmt)
+    return str(p)
+
+
+def test_magnetic_survey_runs_end_to_end(tmp_path):
+    """A second physics through the same engine: nT in, susceptibility out."""
+    from src import mag_forward as mf
+    x, y = _grid_xyz()
+    z = np.full(x.size, 1650.0)
+    st = np.column_stack([x, y, z])
+    c = np.array([[x.mean(), y.mean(), -700.0]])
+    t = mf.mag_tf(st, c, np.array([[400.0, 400.0, 400.0]]), [0.05],
+                  55000.0, 70.0, 2.0)
+    t = t + np.random.default_rng(1).normal(0, 1.0, x.size)
+    p = _write_rows(tmp_path, "mag.csv", "x,y,z,tmi", [x, y, z, t])
+    out = tmp_path / "m.html"
+    cli.main(["report", "--survey", p, "--field", "mag", "--noise", "1.0",
+              "--prior-sd", "3e-4", "--corr-len", "400", "--cell", "300",
+              "--depth", "1200", "--b0", "55000", "--inclination", "70",
+              "--samples", "120", "--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    assert "susceptibility" in html and "nT" in html
+    assert "remanence is not modelled" in html, "state the model-class limit"
+
+
+def test_lon_lat_input_gives_the_same_answer_as_projected_metres(tmp_path):
+    """THE projection gate at product level: the same survey expressed in
+    degrees and in metres must produce the same number, or the tangent plane
+    is silently rescaling the customer's ground."""
+    import json
+    x, y = _grid_xyz()
+    z = np.full(x.size, 1650.0)
+    g = (0.08 * np.exp(-((x - x.mean())**2 + (y - y.mean())**2) / 6e5)
+         + np.random.default_rng(2).normal(0, 0.01, x.size))
+    pm = _write_rows(tmp_path, "m.csv", "x,y,z,gz", [x, y, z, g], fmt="%.4f")
+
+    lat0, lon0 = 38.5, -112.85
+    s = np.sin(np.radians(lat0))
+    w = 1.0 - SV.WGS84_E2 * s * s
+    n_rad = SV.WGS84_A / np.sqrt(w)
+    m_rad = SV.WGS84_A * (1.0 - SV.WGS84_E2) / w**1.5
+    lon = lon0 + np.degrees((x - x.mean()) / (n_rad * np.cos(np.radians(lat0))))
+    lat = lat0 + np.degrees((y - y.mean()) / m_rad)
+    gp = _write_rows(tmp_path, "d.csv", "lon,lat,elev,mgal", [lon, lat, z, g],
+                     fmt="%.9f")
+
+    args = ["--noise", "0.01", "--prior-sd", "0.05", "--corr-len", "400",
+            "--cell", "300", "--depth", "1200", "--samples", "120"]
+    a, b = tmp_path / "a.html", tmp_path / "b.html"
+    cli.main(["report", "--survey", pm] + args + ["--out", str(a)])
+    cli.main(["report", "--survey", gp] + args + ["--out", str(b)])
+    va = json.loads(a.with_suffix(".json").read_text())["value"]
+    vb = json.loads(b.with_suffix(".json").read_text())["value"]
+    assert abs(va - vb) < 1e-3 * max(abs(va), 1e-9), f"{va} vs {vb}"
+    assert "tangent plane" in b.read_text(encoding="utf-8")
+
+
+def test_topography_removes_air_cells(tmp_path):
+    """Over 600 m of relief a flat-topped mesh hands the inversion air to put
+    density into, and it will."""
+    import json
+    x, y = _grid_xyz()
+    z = 1650 + 320 * np.sin((x - x.min()) / 700.0)
+    g = np.random.default_rng(3).normal(0, 0.01, x.size)
+    p = _write_rows(tmp_path, "t.csv", "x,y,z,gz", [x, y, z, g], fmt="%.4f")
+    args = ["--noise", "0.01", "--prior-sd", "0.05", "--corr-len", "400",
+            "--cell", "200", "--depth", "1200", "--samples", "120"]
+    on, off = tmp_path / "on.html", tmp_path / "off.html"
+    cli.main(["report", "--survey", p] + args + ["--topography", "on",
+                                                 "--out", str(on)])
+    cli.main(["report", "--survey", p] + args + ["--topography", "off",
+                                                 "--out", str(off)])
+    j_on = json.loads(on.with_suffix(".json").read_text())
+    j_off = json.loads(off.with_suffix(".json").read_text())
+    assert j_on["cells_active"] < j_off["cells_active"], "air must be dropped"
+    assert j_off["cells_active"] == j_off["cells_total"]
+    assert "draped" in on.read_text(encoding="utf-8")
+
+
+def test_a_lease_block_polygon_is_used_as_the_region(tmp_path):
+    """A customer reports on their own ground, not a box we chose."""
+    import json
+    x, y = _grid_xyz()
+    z = np.full(x.size, 1650.0)
+    g = (0.08 * np.exp(-((x - x.mean())**2 + (y - y.mean())**2) / 6e5)
+         + np.random.default_rng(4).normal(0, 0.01, x.size))
+    p = _write_rows(tmp_path, "s.csv", "x,y,z,gz", [x, y, z, g], fmt="%.4f")
+    cx, cy = x.mean(), y.mean()
+    poly = tmp_path / "block.csv"
+    np.savetxt(poly, np.array([[cx - 600, cy - 500], [cx + 400, cy - 600],
+                               [cx + 600, cy + 300], [cx - 500, cy + 500]]),
+               delimiter=",", header="x,y", comments="", fmt="%.2f")
+    out = tmp_path / "p.html"
+    cli.main(["report", "--survey", p, "--noise", "0.01", "--prior-sd", "0.05",
+              "--corr-len", "400", "--cell", "300", "--depth", "1200",
+              "--samples", "120", "--region-file", str(poly), "--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    assert "block.csv" in html and "km2" in html
+
+
+def test_a_mis_scaled_prior_is_warned_about_with_a_number(tmp_path, capsys):
+    """--prior-sd is a PER-CELL sd, so a user hunting a 0.06 SI body types
+    0.06 and declares a prior predicting hundreds of nT over a survey that
+    reads single digits. Say so, and say what to use instead."""
+    x, y = _grid_xyz()
+    z = np.full(x.size, 1650.0)
+    g = np.random.default_rng(5).normal(0, 0.01, x.size)
+    p = _write_rows(tmp_path, "w.csv", "x,y,z,gz", [x, y, z, g], fmt="%.4f")
+    cli.main(["report", "--survey", p, "--noise", "0.01", "--prior-sd", "5.0",
+              "--corr-len", "400", "--cell", "300", "--depth", "1200",
+              "--samples", "120", "--out", str(tmp_path / "w.html")])
+    o = capsys.readouterr().out
+    assert "WARNING" in o and "PER-CELL" in o and "try about" in o
+
+
+def test_every_core_gate_actually_runs(tmp_path):
+    """A refactor once inserted an early `return` after the licensing gate,
+    which orphaned calibration and stability. Every run afterwards executed
+    two of four gates and reported INCOMPLETE, and the printed PASS lines
+    looked entirely normal. Count them."""
+    out = tmp_path / "gates.html"
+    cli.main(["report", "--survey", _survey(tmp_path)] + BASE
+             + ["--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    for gate in ("licensing", "calibration", "stability", "adequacy"):
+        assert gate in html, f"core gate {gate} never ran"
+    assert "INCOMPLETE" not in html

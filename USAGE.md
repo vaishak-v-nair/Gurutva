@@ -14,11 +14,21 @@ x,y,z,gz
 
 | column | meaning |
 |---|---|
-| `x`, `y` | position in **metres**, any consistent projected system (UTM is fine) |
+| `x`, `y` | position in **metres** (UTM is fine) **or `lon`,`lat` in degrees** — detected automatically and projected onto a local tangent plane, accurate to a few parts per million across a survey |
 | `z` | station elevation in **metres**, z-up |
 | `gz` | your gravity anomaly in **mGal**, background already removed |
 
-An example you can run right now: `examples/demo_survey.csv` (120 stations).
+Column names are case-insensitive and common aliases work: `lon`/`longitude`/`easting`, `lat`/`latitude`/`northing`, `elev`/`elevation`/`height`, `gz`/`mgal`/`tmi`/`nt`.
+
+Examples you can run right now:
+
+| file | what it is |
+|---|---|
+| `examples/demo_survey.csv` | 120 gravity stations, projected metres |
+| `examples/demo_survey_latlon.csv` | the same survey in lon/lat degrees |
+| `examples/demo_survey_topo.csv` | the same survey over 667 m of relief |
+| `examples/demo_magnetics.csv` | a magnetic survey, total-field nT |
+| `examples/demo_lease_block.csv` | a 5-vertex lease block to report on |
 
 ## 2. Ask what your survey can see — BEFORE you trust it
 

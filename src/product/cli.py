@@ -1,7 +1,7 @@
 """`gurutva` — the command a customer actually runs.
 
 Everything else in this repo is machinery. This is the product: point it at a
-gravity survey you own and get back the verdict report.
+survey you own and get back the verdict report.
 
     py -3 -m src.product.cli report   --survey mysurvey.csv --noise 0.05 \
         --prior-sd 0.25 --corr-len 500 --out report.html
@@ -12,54 +12,66 @@ gravity survey you own and get back the verdict report.
 Two modes, because a customer has two different questions.
 
   report    You have data. What does it support? Runs the four core gates and
-            returns the interval on mass in a region, the informed-fraction
-            map, and the depth below which the model is invented. Gate 5
-            CANNOT run here — there is no known truth on real data — and the
-            verdict says so rather than letting silence read as success.
+            returns the interval on the quantity a decision turns on, the
+            informed-fraction map, and the depth below which the model is
+            invented. Gate 5 CANNOT run here — real data has no known truth —
+            so the verdict says PROVISIONAL rather than letting silence read
+            as success.
 
-  selftest  You have a survey design, or you are about to pay for one. We
-            plant a body of known size and depth, simulate what YOUR station
-            layout and YOUR noise would record, and invert it. Gate 5 runs,
-            because now the truth is known. This answers "what can my survey
-            actually prove", which is the question worth asking before the
-            money is spent, not after.
+  selftest  You have a survey design, or are about to pay for one. We plant a
+            body of known size and depth, simulate what YOUR stations and
+            YOUR noise would record, and invert it. Gate 5 runs, because now
+            the truth is known, and the verdict can reach CLAIMABLE.
 
-INPUT FORMAT. One CSV, four columns, header row required:
+INPUT. One CSV, four columns, header row required:
 
-    x,y,z,gz
-    331000,4263000,1650.2,-112.44
+    x,y,z,gz            projected metres, or lon,lat in degrees
+    331000,4263000,1650.2,-0.084
 
-    x, y   horizontal position in METRES, any consistent projected system
-    z      station elevation in METRES, z-UP (a mass below reads negative)
-    gz     observed gravity anomaly in mGal, background already removed
+  x, y   easting/northing in METRES, or longitude/latitude in DEGREES —
+         detected automatically and projected onto a local tangent plane
+  z      station elevation in METRES, z-UP
+  gz     gravity anomaly in mGal, or (with --field mag) total-field
+         anomaly in nT. Background already removed.
 
-Nothing is guessed. `--noise` is mandatory and must be YOUR measured
-repeatability, because the adequacy gate is meaningless without it, and a
-tool that invents a noise floor is inventing its own passing grade.
+Nothing is guessed. --noise, --prior-sd and --corr-len are mandatory: a tool
+that invents a noise floor is inventing its own passing grade.
 """
 
 import argparse
 import json
+import subprocess
 import sys
+import warnings
 from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src import prism_forward as pf
+from src import mag_forward as mf, prism_forward as pf
 from src.gurutva_core import gates
-from src.product import prior as PR, report, verdict as V
+from src.product import prior as PR, report, survey as SV, verdict as V
 
-from scipy.spatial import cKDTree as _KD
+MAX_CELLS = 60_000       # laptop guard; refuse rather than swap for an hour
+
+# What changes between the two physics, and nothing else does.
+FIELDS = {
+    "gravity": dict(data_unit="mGal", model_unit="g/cc",
+                    quantity="excess mass", out_unit="Mt", scale=1e-6,
+                    weight="volume"),
+    "mag": dict(data_unit="nT", model_unit="SI susceptibility",
+                quantity="mean susceptibility", out_unit="SI", scale=1.0,
+                weight="mean"),
+}
 
 
 def _version():
     """Stamp the report with the commit it came from. An auditable document
     that cannot say which code produced it is not auditable."""
-    import subprocess
     try:
         h = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
                            cwd=Path(__file__).resolve().parents[2],
@@ -70,23 +82,21 @@ def _version():
 
 
 _VERSION = _version()
-MAX_CELLS = 60_000       # laptop guard; refuse rather than swap for an hour
 
 
 def load_survey(path):
     """Read x,y,z,gz and REFUSE anything it cannot honestly invert.
 
-    Every guard below is here because a hostile pass over the CLI hit it:
-    a semicolon-delimited export (the European default) died inside
-    genfromtxt, a UTF-8 BOM turned the first column into "﻿x" so the
-    error blamed a missing x, a single NaN sailed through and was caught
-    three gates later by luck, and a collinear survey crashed in the sparse
-    factoriser with "zero-size array to reduction operation minimum".
+    Every guard is here because a hostile pass over the CLI hit it: a
+    semicolon export died inside genfromtxt, a UTF-8 BOM turned the first
+    column into a name starting with U+FEFF so the error blamed a missing x,
+    a single NaN sailed through and was caught three gates later by luck, and
+    a collinear survey crashed in the sparse factoriser.
 
-    A tool aimed at people who are not programmers has to fail at the door,
-    in their language, naming the row.
+    Returns (stations, data, meta). Geographic coordinates are detected and
+    projected; meta records what happened so the report can say so.
     """
-    raw = Path(path).read_text(encoding="utf-8-sig", errors="replace")  # eats BOM
+    raw = Path(path).read_text(encoding="utf-8-sig", errors="replace")
     head = raw.splitlines()[0] if raw.strip() else ""
     delim = max((",", ";", "\t"), key=lambda c: head.count(c))
     if head.count(delim) < 3:
@@ -94,9 +104,8 @@ def load_survey(path):
             f"{path}: could not find 4 columns in the header line.\n"
             f"  got: {head[:70]!r}\n"
             f"  need: x,y,z,gz  (comma, semicolon or tab separated)")
-    import warnings
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")          # we report the errors ourselves
+        warnings.simplefilter("ignore")      # we report the errors ourselves
         rows = np.genfromtxt(raw.splitlines(), delimiter=delim, names=True,
                              dtype=float, invalid_raise=False)
     body = [ln for ln in raw.splitlines()[1:] if ln.strip()]
@@ -112,36 +121,53 @@ def load_survey(path):
                "  Header and data must use the same separator."))
     names = tuple(n.strip().lower() for n in (rows.dtype.names or ()))
     rows.dtype.names = names
+    alias = {"lon": "x", "longitude": "x", "easting": "x",
+             "lat": "y", "latitude": "y", "northing": "y",
+             "elev": "z", "elevation": "z", "height": "z",
+             "grav": "gz", "mgal": "gz", "tmi": "gz", "nt": "gz"}
+    names = tuple(alias.get(n, n) for n in names)
+    rows.dtype.names = names
     missing = [c for c in ("x", "y", "z", "gz") if c not in names]
     if missing:
         raise SystemExit(
             f"{path}: missing column(s) {', '.join(missing)}.\n"
             f"  found: {', '.join(names) or '(none)'}\n"
-            f"  need:  x,y,z,gz  (metres, metres, metres, mGal)")
+            f"  need:  x,y,z,gz  (metres or lon/lat degrees, metres, data)")
 
-    st = np.column_stack([rows["x"], rows["y"], rows["z"]]).astype(float)
-    d = np.asarray(rows["gz"], dtype=float)
+    x, y = np.asarray(rows["x"], float), np.asarray(rows["y"], float)
+    z, d = np.asarray(rows["z"], float), np.asarray(rows["gz"], float)
 
-    bad = ~np.isfinite(np.column_stack([st, d[:, None]])).all(axis=1)
+    bad = ~np.isfinite(np.column_stack([x, y, z, d])).all(axis=1)
     if bad.any():
-        first = int(np.argmax(bad)) + 2          # +2: 1-based, past the header
+        first = int(np.argmax(bad)) + 2          # 1-based, past the header
         raise SystemExit(
             f"{path}: {int(bad.sum())} row(s) contain a blank or non-numeric "
             f"value; the first is line {first}.\n"
             f"  Gurutva will not guess a missing reading. Remove those rows "
             f"or fill them in.")
-    if len(st) < 8:
-        raise SystemExit(f"{path}: only {len(st)} stations. Too few to say "
+    if len(x) < 8:
+        raise SystemExit(f"{path}: only {len(x)} stations. Too few to say "
                          "anything honest about a 3-D density field.")
 
-    ext_x = st[:, 0].max() - st[:, 0].min()
-    ext_y = st[:, 1].max() - st[:, 1].min()
-    if min(ext_x, ext_y) <= 0:
+    meta = {"geographic": False}
+    if SV.looks_geographic(x, y):
+        try:
+            x, y, pm = SV.project(x, y)
+        except ValueError as e:
+            raise SystemExit(f"{path}: {e}")
+        meta = {"geographic": True, **pm}
+        print(f"  coordinates read as lon/lat and projected onto a local "
+              f"tangent plane at {pm['lat0']:.4f}, {pm['lon0']:.4f} "
+              f"(survey spans {pm['span_km']:.1f} km)")
+
+    st = np.column_stack([x, y, z])
+    ex, ey = x.max() - x.min(), y.max() - y.min()
+    if min(ex, ey) <= 0:
         raise SystemExit(
-            f"{path}: the stations span {ext_x:,.0f} m east-west and "
-            f"{ext_y:,.0f} m north-south.\n"
-            f"  A survey along a single line cannot constrain a 3-D density "
-            f"field — there is no second horizontal direction for the data to "
+            f"{path}: the stations span {ex:,.0f} m east-west and {ey:,.0f} m "
+            f"north-south.\n"
+            f"  A survey along a single line cannot constrain a 3-D field — "
+            f"there is no second horizontal direction for the data to "
             f"resolve. Use a 2-D layout, or a profile-specific tool.")
 
     uniq = len({(round(a, 3), round(b, 3)) for a, b in st[:, :2]})
@@ -149,23 +175,26 @@ def load_survey(path):
         print(f"  warning: {len(st) - uniq} station(s) repeat an existing "
               f"x,y position. Repeats add no new information and will make "
               f"the survey look better resolved than it is.")
-    return st, d
+    return st, d, meta
 
 
-def build_mesh(stations, cell, top, bottom, margin=0.25):
-    """A regular block under the survey. Extent from the data, not from taste."""
+def build_mesh(stations, cell, depth, top=None, drape=True, margin=0.25):
+    """A regular block under the survey, optionally draped to topography.
+
+    Returns (centers, dims, shape, volumes, active). `active` is False for
+    cells above the ground: with a flat-topped block over rolling terrain the
+    inversion is handed air to put density into, and it will.
+    """
     x0, x1 = stations[:, 0].min(), stations[:, 0].max()
     y0, y1 = stations[:, 1].min(), stations[:, 1].max()
+    ceiling = float(stations[:, 2].max()) if top is None else float(top)
     mx, my = (x1 - x0) * margin, (y1 - y0) * margin
     xs = np.arange(x0 - mx + cell / 2, x1 + mx, cell)
     ys = np.arange(y0 - my + cell / 2, y1 + my, cell)
-    zs = np.arange(bottom + cell / 2, top, cell)
-    # A zero-length axis used to reach the sparse factoriser and die there
-    # with "zero-size array to reduction operation minimum", which tells a
-    # geologist nothing. Catch it here, in their units.
+    zs = np.arange(ceiling - depth + cell / 2, ceiling, cell)
     for n, span, hint in ((len(xs), x1 - x0, "--cell smaller than the survey width"),
                           (len(ys), y1 - y0, "--cell smaller than the survey height"),
-                          (len(zs), top - bottom, "--depth larger than --cell")):
+                          (len(zs), depth, "--depth larger than --cell")):
         if n < 1:
             raise SystemExit(
                 f"mesh has zero cells along one axis: that extent is "
@@ -177,15 +206,42 @@ def build_mesh(stations, cell, top, bottom, margin=0.25):
     CX, CY, CZ = np.meshgrid(xs, ys, zs, indexing="ij")
     centers = np.column_stack([CX.ravel(), CY.ravel(), CZ.ravel()])
     dims = np.tile([cell, cell, cell], (len(centers), 1))
-    return centers, dims, (len(xs), len(ys), len(zs)), np.full(len(centers),
-                                                              cell ** 3)
+    vol = np.full(len(centers), cell ** 3)
+    shape = (len(xs), len(ys), len(zs))
+
+    if drape:
+        active = ~SV.air_mask(centers, stations)
+        if active.sum() < 8:
+            raise SystemExit(
+                "draping to topography left almost no cells below ground. "
+                "Check that --depth is measured downward and that station "
+                "elevations are in metres.")
+    else:
+        active = np.ones(len(centers), dtype=bool)
+    return centers, dims, shape, vol, active
 
 
-def core_gates(G, prior, d, noise, rng, n_post, mean, sd):
+def core_gates(G, prior, d, rng, n_post, mean, sd, unit="", prior_sd=None):
     suite = gates.GateSuite()
     sims = (G @ prior.sample(rng, 300)
             + rng.standard_normal((G.shape[0], 300))).T
     suite.add(gates.licensing(d, sims))
+
+    # SCALE ADVICE, because --prior-sd is a per-CELL marginal sd and thousands
+    # of correlated cells add up. A user hunting a body of susceptibility 0.06
+    # will type 0.06 and declare a prior that predicts 600 nT of signal over a
+    # survey that reads 4. Licensing passes (an over-wide prior makes anything
+    # look typical) and adequacy then fails as OVERFITS, which is a true but
+    # unhelpful thing to be told. So say the useful version instead.
+    pred, obs = float(np.std(sims)), float(np.std(d))
+    ratio = pred / obs if obs > 0 else np.inf
+    if prior_sd is not None and (ratio > 10 or ratio < 0.1):
+        wide = "too wide" if ratio > 1 else "too tight"
+        print(f"  WARNING: your declared prior predicts data with spread "
+              f"{pred:.3g} but yours has {obs:.3g} ({ratio:.0f}x {wide}).")
+        print(f"           --prior-sd is a PER-CELL sd and correlated cells "
+              f"add up. For this survey try about "
+              f"{prior_sd / ratio:.2g} {unit}.")
 
     SGt = prior.apply_inv(G.T)
     Kd = G @ SGt + np.eye(G.shape[0])
@@ -202,52 +258,66 @@ def core_gates(G, prior, d, noise, rng, n_post, mean, sd):
     suite.add(gates.GateReport("calibration(MC)", med < 4 * floor, med,
                                f"median < {4 * floor:.3f} ({n_post}-sample floor)",
                                "exact functional sd vs sampled"))
-
     sd_b, _ = PR.posterior_sd(G, prior, np.random.default_rng(77), n_post)
     suite.add(gates.stability((mean, sd), (mean, sd_b), atol=1e-9))
-    return suite
+    return suite, dict(prior_pred=pred, observed=obs, ratio=ratio)
 
 
 def run(args):
-    stations, d_obs = load_survey(args.survey)
-    top = args.top if args.top is not None else float(stations[:, 2].min())
-    centers, dims, shape, vol = build_mesh(stations, args.cell, top,
-                                           top - args.depth)
+    cfg = FIELDS[args.field]
+    stations, d_obs, geo = load_survey(args.survey)
+    # bool(), not np.bool_: a numpy scalar leaks all the way to json.dumps
+    # and dies with "Object of type bool is not JSON serializable" AFTER the
+    # whole inversion has run. Found by running the tool, not by reading it.
+    drape = bool(args.topography == "on" or
+                 (args.topography == "auto"
+                  and np.ptp(stations[:, 2]) > args.cell / 2))
+    centers, dims, shape, vol, active = build_mesh(
+        stations, args.cell, args.depth, args.top, drape)
     rng = np.random.default_rng(args.seed)
-    print(f"survey: {len(stations)} stations | mesh {shape[0]}x{shape[1]}x"
-          f"{shape[2]} = {len(centers):,} cells at {args.cell:g} m")
+    print(f"survey: {len(stations)} stations | {args.field} | mesh "
+          f"{shape[0]}x{shape[1]}x{shape[2]} at {args.cell:g} m, "
+          f"{int(active.sum()):,} of {len(centers):,} cells below ground"
+          f"{' (draped to topography)' if drape else ' (flat top)'}")
 
-    G_raw = pf.prism_matrix(stations, centers, dims)
+    if args.field == "gravity":
+        G_raw = pf.prism_matrix(stations, centers[active], dims[active])
+    else:
+        G_raw = mf.mag_matrix(stations, centers[active], dims[active],
+                              args.b0, args.inclination, args.declination)
     G = G_raw / args.noise
     prior, pmeta = PR.build_regular(shape, (args.cell,) * 3, args.prior_sd,
-                                    args.corr_len, rng)
+                                    args.corr_len, rng, active=active)
 
     truth = None
     if args.mode == "selftest":
-        # plant a compact body at the declared depth, directly under the
-        # survey centre — the thing the customer wants to know they'd see
         cx, cy = stations[:, 0].mean(), stations[:, 1].mean()
-        zb = top - args.body_depth
-        inside = ((np.hypot(centers[:, 0] - cx, centers[:, 1] - cy) < args.body_radius)
-                  & (np.abs(centers[:, 2] - zb) < args.body_radius))
+        zb = float(stations[:, 2].max()) - args.body_depth
+        ca = centers[active]
+        inside = ((np.hypot(ca[:, 0] - cx, ca[:, 1] - cy) < args.body_radius)
+                  & (np.abs(ca[:, 2] - zb) < args.body_radius))
         if not inside.any():
             raise SystemExit("planted body falls outside the mesh — increase "
                              "--depth or reduce --body-depth")
         truth = np.where(inside, args.body_contrast, 0.0)
         d_obs = G_raw @ truth + args.noise * rng.standard_normal(len(stations))
-        print(f"  self-test: {int(inside.sum())} cells at {args.body_contrast:+g} "
-              f"g/cc, {args.body_depth:g} m below the surface; "
-              f"peak signal {np.abs(G_raw @ truth).max():.3f} mGal against "
-              f"{args.noise:g} mGal noise")
+        print(f"  self-test: {int(inside.sum())} cells at "
+              f"{args.body_contrast:+g} {cfg['model_unit']}, "
+              f"{args.body_depth:g} m deep; peak signal "
+              f"{np.abs(G_raw @ truth).max():.3f} {cfg['data_unit']} against "
+              f"{args.noise:g}")
 
     dw = d_obs / args.noise
     mean = PR.posterior_mean(G, prior, dw)
-    sd, sd_err = PR.posterior_sd(G, prior, np.random.default_rng(11), args.samples)
+    sd, sd_err = PR.posterior_sd(G, prior, np.random.default_rng(11),
+                                 args.samples)
     rms = float(np.sqrt(np.mean((G_raw @ mean - d_obs) ** 2)))
 
-    suite = core_gates(G, prior, dw, args.noise, rng, args.samples, mean, sd)
-    # Reference is what THIS model predicts of itself, not the raw noise —
-    # a flexible model should fit better than the noise, and comparing to the
+    suite, scale_info = core_gates(G, prior, dw, rng, args.samples, mean, sd,
+                                   unit=cfg["model_unit"],
+                                   prior_sd=args.prior_sd)
+    # Reference is what THIS model predicts of itself, not the raw noise: a
+    # flexible model should fit better than the noise, and comparing to the
     # noise punishes it for being correct. See prior.expected_residual.
     ref = args.noise * PR.expected_residual(G, prior)
     suite.add(gates.adequacy(rms, ref))
@@ -255,42 +325,95 @@ def run(args):
         suite.add(gates.recovery(mean, sd, truth))
 
     # ---- the numbers a decision turns on --------------------------------
+    ca, va = centers[active], vol[active]
     prior_sd_cell = prior.marginal_sd(np.random.default_rng(55), 400)
     inf = 1.0 - sd / prior_sd_cell
-    z = centers[:, 2]
+    # BLIND DEPTH, on the 90th percentile rather than the median.
+    #
+    # The median asks "is the TYPICAL cell at this depth informed", which is
+    # the right question for a broad gravity anomaly and the wrong one for a
+    # compact magnetic body: a real magnetic survey lights up a handful of
+    # cells to 87% while the median cell sits at 1.3%, so a median rule
+    # declared the whole model blind and the report had nothing to say. The
+    # question that works for both is "does this depth contain ANYTHING the
+    # survey can see", which is a high quantile.
+    z = ca[:, 2]
     edges = np.linspace(z.min(), z.max(), 20)
-    lit = [0.5 * (edges[i] + edges[i + 1]) for i in range(len(edges) - 1)
-           if np.any((z >= edges[i]) & (z < edges[i + 1]))
-           and np.median(inf[(z >= edges[i]) & (z < edges[i + 1])]) > 0.05]
+    lit, typical = [], []
+    for i in range(len(edges) - 1):
+        m = (z >= edges[i]) & (z < edges[i + 1])
+        if not np.any(m):
+            continue
+        zc = 0.5 * (edges[i] + edges[i + 1])
+        if np.percentile(inf[m], 90) > 0.05:
+            lit.append(zc)
+        if np.median(inf[m]) > 0.05:
+            typical.append(zc)
     z_blind = min(lit) if lit else z.max()
+    z_typical = min(typical) if typical else None
 
-    cx, cy = stations[:, 0].mean(), stations[:, 1].mean()
-    half = args.region / 2.0
-    box = ((np.abs(centers[:, 0] - cx) < half)
-           & (np.abs(centers[:, 1] - cy) < half) & (z > z_blind))
-    w = np.where(box, vol, 0.0)
+    if args.region_file:
+        vx, vy = SV.read_polygon(args.region_file)
+        if geo.get("geographic") and np.abs(vx).max() <= 180:
+            vx, vy, _ = SV.project(vx, vy, geo["lon0"], geo["lat0"])
+        box = SV.points_in_polygon(ca[:, 0], ca[:, 1], vx, vy) & (z > z_blind)
+        region_desc = (f"your {SV.polygon_area(vx, vy) / 1e6:,.2f} km2 block "
+                       f"from {Path(args.region_file).name}")
+    else:
+        cx, cy = stations[:, 0].mean(), stations[:, 1].mean()
+        half = args.region / 2.0
+        box = ((np.abs(ca[:, 0] - cx) < half) & (np.abs(ca[:, 1] - cy) < half)
+               & (z > z_blind))
+        region_desc = (f"the {args.region / 1000:g} km block at the centre of "
+                       f"your survey")
+    if not box.any():
+        # Do not crash and do not quietly widen: say which of the two things
+        # actually happened, because they call for different fixes.
+        if not lit:
+            raise SystemExit(
+                "your survey does not constrain a single depth level: even "
+                "the best-informed cells stay below 5% of their prior. "
+                "Nothing here can be reported honestly. Either the data is "
+                "too weak for this mesh, or --prior-sd is far too wide "
+                "(check the scale warning above).")
+        raise SystemExit(
+            f"the reporting region contains no cells above the blind depth "
+            f"({z_blind:,.0f} m). Widen --region, move --region-file, or "
+            f"accept that the survey sees nothing under that block.")
+
+    w = np.where(box, va, 0.0)
+    if cfg["weight"] == "mean":
+        w = w / w.sum()                      # volume-weighted average, not a sum
     m_box = float(w @ mean)
     sd_box = PR.functional_sd(G, prior, w)
     naive = float(np.sqrt(np.sum(w**2 * sd**2)))
-    MT = 1e-6
+    S = cfg["scale"]
+    lo, hi = (m_box - 1.96 * sd_box) * S, (m_box + 1.96 * sd_box) * S
+    # Susceptibility lives near 1e-5, so a fixed-point format prints "-0.0000"
+    # for every real answer. Mass is read in Mt and wants thousands separators.
+    fmt = ",.1f" if args.field == "gravity" else ".3e"
 
     numbers = {
-        f"excess mass, {args.region / 1000:g}x{args.region / 1000:g} km block above the blind depth":
-            f"{m_box * MT:+,.1f} Mt  (95%: {(m_box - 1.96 * sd_box) * MT:+,.1f} "
-            f"to {(m_box + 1.96 * sd_box) * MT:+,.1f} Mt)",
+        f"{cfg['quantity']}, {region_desc}, above the blind depth":
+            f"{m_box * S:+{fmt}} {cfg['out_unit']}  "
+            f"(95%: {lo:+{fmt}} to {hi:+{fmt}})",
         "is that a detection?":
             ("YES — the 95% interval excludes zero"
              if abs(m_box) > 1.96 * sd_box else
              f"NO — consistent with zero. 95% upper limit "
-             f"{(abs(m_box) + 1.96 * sd_box) * MT:,.1f} Mt"),
+             f"{(abs(m_box) + 1.96 * sd_box) * S:{fmt}} {cfg['out_unit']}"),
         "your model is INVENTED below":
-            f"{z_blind:,.0f} m elevation ({z.max() - z_blind:,.0f} m below the "
-            f"top of the mesh) — deeper than this, the typical cell is the "
-            f"prior, not your data",
+            f"{z_blind:,.0f} m elevation — deeper than this NOTHING in the "
+            f"model is constrained by your data",
+        "and the TYPICAL cell is informed only above":
+            (f"{z_typical:,.0f} m elevation" if z_typical is not None else
+             "no depth at all — your survey lights up a few cells strongly "
+             "and leaves the rest to the prior, which is normal for a "
+             "compact body and means per-cell values are not a map"),
         "cells your survey informs (>5%)":
             f"{float(np.mean(inf > 0.05)) * 100:.1f}% of {len(inf):,}",
         "per-cell shortcut would have said":
-            f"+/-{naive * MT:,.1f} Mt instead of +/-{sd_box * MT:,.1f} Mt "
+            f"+/-{naive * S:{fmt}} instead of +/-{sd_box * S:{fmt}} "
             f"({sd_box / naive:.2f}x) — neighbouring cells trade off, so the "
             f"variance of a sum is not the sum of variances",
     }
@@ -303,9 +426,9 @@ def run(args):
                  "NO — the planted body is NOT recovered inside its interval"),
             "recovery": f"{rec.value * 100:.0f}% of cells cover the truth, "
                         f"worst miss {float(rec.note.split()[1]):.1f} sigma",
-            "planted body":
-                f"{args.body_contrast:+g} g/cc, radius {args.body_radius:g} m, "
-                f"{args.body_depth:g} m deep",
+            "planted body": f"{args.body_contrast:+g} {cfg['model_unit']}, "
+                            f"radius {args.body_radius:g} m, "
+                            f"{args.body_depth:g} m deep",
             **numbers,
         }
 
@@ -314,20 +437,19 @@ def run(args):
                           else Path(args.survey).name))
     print("\n" + str(v))
 
-    # THE FIGURE. The footer used to promise "per-cell map from N posterior
-    # samples" and no map was ever drawn — the arrays were computed and thrown
-    # away. A customer was told about a picture they were never shown.
+    # ---- the figure the footer promises ---------------------------------
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.2), dpi=140)
     cy_ = stations[:, 1].mean()
-    kd = _KD(centers)
-    xg = np.linspace(centers[:, 0].min(), centers[:, 0].max(), 200)
-    zg = np.linspace(centers[:, 2].min(), centers[:, 2].max(), 120)
+    kd = cKDTree(ca)
+    xg = np.linspace(ca[:, 0].min(), ca[:, 0].max(), 200)
+    zg = np.linspace(ca[:, 2].min(), ca[:, 2].max(), 120)
     XX, ZZ = np.meshgrid(xg, zg)
     dist, idx = kd.query(np.column_stack(
         [XX.ravel(), np.full(XX.size, cy_), ZZ.ravel()]))
     outside = (dist > args.cell * 1.5).reshape(XX.shape)
     for ax, val, ttl, cm, kw in [
-        (axes[0], sd, "how uncertain each cell still is (g/cc)", "viridis", {}),
+        (axes[0], sd, f"how uncertain each cell still is ({cfg['model_unit']})",
+         "viridis", {}),
         (axes[1], inf, "informed fraction: 1 = your data knows it, "
          "0 = it is your prior talking", "magma",
          dict(vmin=0, vmax=max(0.2, float(np.nanmax(inf))))),
@@ -336,6 +458,7 @@ def run(args):
         im = ax.pcolormesh(xg / 1000, zg, Z, cmap=cm, shading="auto", **kw)
         fig.colorbar(im, ax=ax, fraction=0.046)
         ax.axhline(z_blind, color="r", lw=1.3, ls="--")
+        ax.plot(stations[:, 0] / 1000, stations[:, 2], "k.", ms=2)
         ax.set_title(ttl, fontsize=9)
         ax.set_xlabel("easting (km)")
     axes[0].set_ylabel("elevation (m)")
@@ -345,21 +468,52 @@ def run(args):
     fig.savefig(figpath)
     plt.close(fig)
 
+    declared = [("field", f"{args.field} ({cfg['data_unit']} in, "
+                          f"{cfg['model_unit']} out)"),
+                ("noise floor", f"{args.noise:g} {cfg['data_unit']} — YOUR "
+                                f"measurement, not our guess"),
+                ("prior sd", f"{args.prior_sd:g} {cfg['model_unit']}"),
+                ("prior correlation length", f"{args.corr_len:g} m"),
+                ("mesh", f"{shape[0]}x{shape[1]}x{shape[2]} at {args.cell:g} m, "
+                         f"{args.depth:g} m deep, "
+                         f"{int(active.sum()):,} cells below ground"),
+                ("topography", "draped from station elevations" if drape
+                               else "flat top"),
+                ("coordinates", f"lon/lat projected to a local tangent plane "
+                                f"at {geo['lat0']:.4f}, {geo['lon0']:.4f}"
+                                if geo.get("geographic") else
+                                "projected metres, used as given"),
+                ("posterior fit", f"{rms:.4g} {cfg['data_unit']} against an "
+                                  f"expected {ref:.4g} for a model with this "
+                                  f"much freedom"),
+                ("prior predicts vs your data",
+                 f"{scale_info['prior_pred']:.3g} vs "
+                 f"{scale_info['observed']:.3g} (whitened) — "
+                 f"{scale_info['ratio']:.1f}x. Far from 1 means --prior-sd is "
+                 f"mis-scaled: it is a PER-CELL sd and correlated cells add "
+                 f"up")]
+    if args.field == "mag":
+        declared.insert(1, ("ambient field",
+                            f"{args.b0:,.0f} nT, inclination "
+                            f"{args.inclination:g}, declination "
+                            f"{args.declination:g} (induced magnetisation "
+                            f"only — remanence is not modelled)"))
+
     report.render(
         out,
-        "Gurutva — survey capability" if truth is not None else "Gurutva — model verdict",
+        "Gurutva — survey capability" if truth is not None
+        else "Gurutva — model verdict",
         f"{Path(args.survey).name} · {len(stations)} stations · "
-        f"{args.noise:g} mGal declared noise",
+        f"{args.noise:g} {cfg['data_unit']} declared noise",
         v, figure=figpath,
-        caption=(f"Section through the model at the centre of your survey. "
-                 f"Below the red line ({z_blind:,.0f} m elevation) the typical "
-                 f"cell is unconstrained: that part of any map you have been "
-                 f"shown is the regularizer, not the rock."),
-        headline=((f"{m_box * MT:+,.1f} Mt"),
-                  (f"excess mass in the {args.region / 1000:g} km block at the "
-                   f"centre of your survey, above the blind depth. "
-                   f"95% between {(m_box - 1.96 * sd_box) * MT:+,.1f} and "
-                   f"{(m_box + 1.96 * sd_box) * MT:+,.1f} Mt."))
+        caption=(f"Section through the model at the centre of your survey; "
+                 f"black dots are stations. Below the red line "
+                 f"({z_blind:,.0f} m elevation) the typical cell is "
+                 f"unconstrained: that part of any map you have been shown is "
+                 f"the regularizer, not the rock."),
+        headline=((f"{m_box * S:+{fmt}} {cfg['out_unit']}"),
+                  (f"{cfg['quantity']} in {region_desc}, above the blind "
+                   f"depth. 95% between {lo:+{fmt}} and {hi:+{fmt}}."))
         if truth is None else
         ((f"{'YES' if suite.recovery_report.passed else 'NO'}"),
          (f"can this survey see a {args.body_radius:g} m body at "
@@ -367,32 +521,27 @@ def run(args):
           f"{suite.recovery_report.value * 100:.0f}% of cells recover the "
           f"planted truth inside their interval.")),
         version=_VERSION,
-        sections=[("What you declared",
-                   [("noise floor", f"{args.noise:g} mGal — YOUR measurement, "
-                     "not our guess"),
-                    ("prior density sd", f"{args.prior_sd:g} g/cc"),
-                    ("prior correlation length", f"{args.corr_len:g} m"),
-                    ("mesh", f"{shape[0]}x{shape[1]}x{shape[2]} at "
-                     f"{args.cell:g} m, {args.depth:g} m deep"),
-                    ("posterior fit", f"{rms:.4g} mGal against an expected "
-                     f"{ref:.4g} mGal for a model with this much freedom")],
+        sections=[("What you declared", declared,
                    "Change any of these and the answer changes. That is not a "
                    "weakness of the method, it is the part every other tool "
                    "hides. Declare them from your site, never tune them until "
                    "a gate turns green.")],
         footer=f"Generated by <code>gurutva {args.mode}</code> · per-cell map "
                f"from {args.samples} posterior samples (MC error "
-               f"{float(np.median(sd_err / sd)) * 100:.1f}%); mass intervals "
-               f"are exact, not sampled.")
+               f"{float(np.median(sd_err / sd)) * 100:.1f}%); the interval on "
+               f"{cfg['quantity']} is exact, not sampled.")
     out.with_suffix(".json").write_text(json.dumps({
-        "mode": args.mode, "survey": str(args.survey),
-        "claimable": v.claimable, "verdict": v.headline,
-        "gates": v.gates, "numbers": numbers,
+        "mode": args.mode, "field": args.field, "survey": str(args.survey),
+        "status": v.status, "claimable": v.claimable, "verdict": v.headline,
+        "gates": v.gates, "numbers": numbers, "geographic": geo,
         "declared": {"noise": args.noise, "prior_sd": args.prior_sd,
                      "corr_len": args.corr_len, "cell": args.cell,
-                     "depth": args.depth},
-        "mass_Mt": m_box * MT, "mass_sd_Mt": sd_box * MT,
-        "z_blind_m": float(z_blind), "rms": rms}, indent=1))
+                     "depth": args.depth, "topography": drape},
+        "value": m_box * S, "value_sd": sd_box * S, "unit": cfg["out_unit"],
+        "prior_scale_check": scale_info,
+        "z_blind_m": float(z_blind), "rms": rms,
+        "cells_active": int(active.sum()), "cells_total": int(len(centers))},
+        indent=1))
     print(f"\nreport -> {out}\njson   -> {out.with_suffix('.json')}")
     return 0 if v.claimable else 1
 
@@ -402,27 +551,37 @@ def main(argv=None):
         prog="gurutva", description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("mode", choices=("report", "selftest"))
-    p.add_argument("--survey", required=True, help="CSV with x,y,z,gz")
+    p.add_argument("--survey", required=True, help="CSV: x,y,z,gz")
+    p.add_argument("--field", choices=tuple(FIELDS), default="gravity")
     p.add_argument("--noise", type=float, required=True,
-                   help="MEASURED repeatability in mGal. Mandatory: the "
-                        "adequacy gate is meaningless without it.")
+                   help="MEASURED repeatability, mGal or nT. Mandatory.")
     p.add_argument("--prior-sd", type=float, required=True,
-                   help="declared density-contrast sd, g/cc (from your rocks)")
+                   help="declared model sd: g/cc, or SI susceptibility")
     p.add_argument("--corr-len", type=float, required=True,
-                   help="declared correlation length, m (how your rock varies)")
+                   help="declared correlation length, m")
+    p.add_argument("--b0", type=float, default=50000.0,
+                   help="mag: ambient field strength, nT")
+    p.add_argument("--inclination", type=float, default=60.0,
+                   help="mag: field inclination, degrees positive down")
+    p.add_argument("--declination", type=float, default=0.0,
+                   help="mag: field declination, degrees east of north")
     p.add_argument("--cell", type=float, default=200.0)
     p.add_argument("--depth", type=float, default=2000.0,
-                   help="mesh depth extent below the shallowest station")
+                   help="mesh depth below the highest station")
     p.add_argument("--top", type=float, default=None)
+    p.add_argument("--topography", choices=("auto", "on", "off"),
+                   default="auto",
+                   help="drape the mesh top to station elevations")
     p.add_argument("--region", type=float, default=2000.0,
-                   help="side length of the block the mass is reported for, m")
+                   help="side of the block the result is reported for, m")
+    p.add_argument("--region-file", default=None,
+                   help="CSV of x,y (or lon,lat) vertices: your lease block")
     p.add_argument("--samples", type=int, default=600)
     p.add_argument("--seed", type=int, default=20260805)
-    p.add_argument("--body-depth", type=float, default=800.0,
-                   help="selftest: depth of the planted body")
+    p.add_argument("--body-depth", type=float, default=800.0)
     p.add_argument("--body-radius", type=float, default=300.0)
     p.add_argument("--body-contrast", type=float, default=-0.3,
-                   help="selftest: density contrast of the planted body, g/cc")
+                   help="selftest: contrast of the planted body")
     p.add_argument("--out", default="gurutva_report.html")
     return run(p.parse_args(argv))
 

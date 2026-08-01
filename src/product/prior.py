@@ -151,7 +151,8 @@ def posterior_sd(G, prior, rng, n=600):
     return sd, sd / np.sqrt(2.0 * (n - 1))
 
 
-def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400):
+def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400,
+                  active=None):
     """Same declared prior on a regular 3D grid (nx, ny, nz).
 
     The TreeMesh path above borrows SimPEG's regularization operators; a
@@ -164,10 +165,30 @@ def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400):
     (corr_len / spacing) so the correlation length is a physical length and
     not an accident of the mesh. Amplitude is then calibrated exactly as in
     build(), so both paths mean the same thing by "0.25 g/cc at 500 m".
+
+    `active`: optional boolean mask over the flattened grid. Cells that are
+    False are dropped entirely and no difference row is built across them.
+    This matters once the mesh follows topography: with a flat-topped block
+    the smoothness term happily correlates rock on one side of a valley with
+    rock on the other THROUGH THE AIR, which is not a statement any geologist
+    would sign. Returns a prior over the ACTIVE cells only, so callers must
+    index their own arrays with the same mask.
     """
     nx, ny, nz = shape
-    n = nx * ny * nz
-    idx = np.arange(n).reshape(shape)
+    n_full = nx * ny * nz
+    if active is None:
+        active = np.ones(n_full, dtype=bool)
+    active = np.asarray(active, dtype=bool).ravel()
+    if active.size != n_full:
+        raise ValueError(f"active mask has {active.size} entries, mesh has "
+                         f"{n_full}")
+    n = int(active.sum())
+    if n < 8:
+        raise ValueError(f"only {n} active cells left after masking")
+    # map full-grid index -> compact index, -1 where inactive
+    remap = np.full(n_full, -1, dtype=np.int64)
+    remap[active] = np.arange(n)
+    idx = np.arange(n_full).reshape(shape)
 
     rows = []
     for axis, h in zip(range(3), spacing):
@@ -175,13 +196,17 @@ def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400):
         if a.shape[0] < 2:
             continue
         i0, i1 = a[:-1].ravel(), a[1:].ravel()
+        keep = active[i0] & active[i1]        # never difference through air
+        i0, i1 = remap[i0[keep]], remap[i1[keep]]
         m = len(i0)
+        if m == 0:
+            continue
         w = corr_len_m / h                    # dimensionless smoothing weight
         rows.append(sp.csr_matrix(
             (np.concatenate([w * np.ones(m), -w * np.ones(m)]),
              (np.concatenate([np.arange(m), np.arange(m)]),
               np.concatenate([i0, i1]))), shape=(m, n)))
-    D = sp.vstack(rows).tocsr()
+    D = sp.vstack(rows).tocsr() if rows else sp.csr_matrix((0, n))
     Q0 = (sp.eye(n, format="csr") + D.T @ D).tocsc()
 
     p0 = SmoothPrior(Q0)
@@ -189,7 +214,8 @@ def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400):
     scale = (sd0 / prior_sd) ** 2
     return SmoothPrior(Q0, scale), dict(raw_median_sd=sd0, scale=scale,
                                         corr_len_m=corr_len_m,
-                                        declared_sd=prior_sd, n_calib=n_calib)
+                                        declared_sd=prior_sd, n_calib=n_calib,
+                                        n_active=n, n_full=n_full)
 
 
 def expected_residual(G, prior):

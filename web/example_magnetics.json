@@ -1,0 +1,45 @@
+{
+ "mode": "report",
+ "field": "mag",
+ "survey": "examples/demo_magnetics.csv",
+ "status": "PROVISIONAL",
+ "claimable": true,
+ "verdict": "PROVISIONAL \u2014 all four core gates pass, but nothing here has been checked against a known right answer. Real data has none. Run a self-test on this survey design to find out what it can actually recover. The numbers below describe demo_magnetics.csv.",
+ "gates": [
+  "[PASS] licensing: 8.667 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.01349 (median < 0.115 (600-sample floor)) exact functional sd vs sampled",
+  "[PASS] stability: 0 (< 1e-09) sd ratio 0.999",
+  "[PASS] adequacy: 0.2419 (0.205 < pp < 1.85) the only gate that tests reality"
+ ],
+ "numbers": {
+  "mean susceptibility, the 2 km block at the centre of your survey, above the blind depth": "-4.565e-05 SI  (95%: -1.097e-04 to +1.840e-05)",
+  "is that a detection?": "NO \u2014 consistent with zero. 95% upper limit 1.097e-04 SI",
+  "your model is INVENTED below": "231 m elevation \u2014 deeper than this NOTHING in the model is constrained by your data",
+  "and the TYPICAL cell is informed only above": "no depth at all \u2014 your survey lights up a few cells strongly and leaves the rest to the prior, which is normal for a compact body and means per-cell values are not a map",
+  "cells your survey informs (>5%)": "22.5% of 2,856",
+  "per-cell shortcut would have said": "+/-1.032e-05 instead of +/-3.268e-05 (3.17x) \u2014 neighbouring cells trade off, so the variance of a sum is not the sum of variances"
+ },
+ "geographic": {
+  "geographic": false
+ },
+ "declared": {
+  "noise": 2.0,
+  "prior_sd": 0.0003,
+  "corr_len": 400.0,
+  "cell": 200.0,
+  "depth": 1600.0,
+  "topography": false
+ },
+ "value": -4.564873932843137e-05,
+ "value_sd": 3.267817004149931e-05,
+ "unit": "SI",
+ "prior_scale_check": {
+  "prior_pred": 4.54799960496068,
+  "observed": 2.1209485916781827,
+  "ratio": 2.1443233573908143
+ },
+ "z_blind_m": 231.4661052631579,
+ "rms": 0.2419221927804234,
+ "cells_active": 2856,
+ "cells_total": 2856
+}
