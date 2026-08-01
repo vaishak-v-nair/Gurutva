@@ -16,12 +16,18 @@ Nothing here is a mock-up.
 Run: py -3 web/make_demo_data.py && py -3 web/build_interactive.py
 """
 
+import base64
 import json
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = json.loads((ROOT / "web" / "demo_data.json").read_text())
+# Encoded from the zip itself, so there is one source of truth for what a
+# visitor downloads rather than a second file that can silently go stale.
+_ZIP = ROOT / "web" / "gurutva.zip"
+ZIP_B64 = base64.b64encode(_ZIP.read_bytes()).decode()
+ZIP_KB = round(_ZIP.stat().st_size / 1024)
 N_TESTS = sum(len(re.findall(r"^def test_", f.read_text(encoding="utf-8"), re.M))
               for f in sorted((ROOT / "tests").glob("test_*.py")))
 geo = json.loads((ROOT / "figures" / "verdict_geothermal.json").read_text())
@@ -62,6 +68,12 @@ h2{font-family:var(--ui);font-size:12px;letter-spacing:.09em;
   text-transform:uppercase;color:var(--mut);font-weight:600;margin:0 0 18px}
 
 header{padding:40px 0 0}
+.hdr{display:flex;align-items:baseline;justify-content:space-between;gap:20px;
+  flex-wrap:wrap}
+.hdr-get{font-family:var(--ui);font-size:13px;font-weight:600;
+  letter-spacing:.03em;text-decoration:none;border:1.5px solid var(--ink);
+  padding:8px 14px;border-radius:6px;white-space:nowrap}
+.hdr-get:hover{background:var(--ink);color:var(--paper)}
 .brand{font-size:24px;letter-spacing:-.01em}
 .brand span{color:var(--mut);font-family:var(--ui);font-size:13px;
   letter-spacing:.06em;text-transform:uppercase;margin-left:12px}
@@ -128,6 +140,18 @@ input[type=range]{width:100%;accent-color:var(--ink);height:28px}
 
 #start{padding:64px 0 40px;border-top:1px solid var(--line)}
 .who{max-width:62ch;margin-bottom:18px;font-size:19px}
+.get{display:inline-block;font-family:var(--ui);font-size:16px;font-weight:600;
+  padding:13px 22px;border-radius:8px;border:2px solid var(--ink);
+  text-decoration:none;letter-spacing:.01em}
+.get:hover{background:var(--ink);color:var(--paper)}
+.getline{margin-top:30px;display:flex;gap:16px;align-items:center;
+  flex-wrap:wrap}
+.getnote{font-family:var(--ui);font-size:13px;color:var(--mut);
+  line-height:1.55;max-width:40ch}
+.need{margin-top:14px;padding:12px 16px;border-left:3px solid var(--pvln);
+  background:var(--pvbg);color:var(--pv);font-family:var(--ui);
+  font-size:13.5px;border-radius:0 6px 6px 0;max-width:60ch}
+.need code{background:transparent;padding:0;font-weight:700}
 .how{margin-top:36px;border:1px solid var(--line);border-radius:8px;
   padding:22px 26px;max-width:64ch}
 .how h3{font-family:var(--ui);font-size:12px;letter-spacing:.09em;
@@ -153,6 +177,11 @@ footer{border-top:1px solid var(--line);padding:22px 0 60px;
 """
 
 JS = r"""
+/* One copy of the bundle, three buttons. Embedding the base64 three times
+   put 165 KB of duplicate string in a page whose whole job is a fast first
+   impression. */
+document.querySelectorAll("[data-dl]").forEach(a =>
+  a.href = "data:application/zip;base64," + __ZIP__);
 const D = __DATA__;
 const NX = D.nx, NZ = D.nz;
 
@@ -259,13 +288,15 @@ window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{
 
 
 def build():
-    js = JS.replace("__DATA__", json.dumps(DATA, separators=(",", ":")))
+    js = (JS.replace("__DATA__", json.dumps(DATA, separators=(",", ":")))
+            .replace("__ZIP__", json.dumps(ZIP_B64)))
     lo = geo["mass_Mt"] - 1.96 * geo["mass_sd_Mt"]
     hi = geo["mass_Mt"] + 1.96 * geo["mass_sd_Mt"]
     html = f"""<style>{CSS}</style>
 <main>
-<header><div class="wrap">
+<header><div class="wrap hdr">
   <div class="brand">Gurutva <span>how much of that picture is real?</span></div>
+  <a class="hdr-get" data-dl href="#get" download="gurutva.zip">Download &nbsp;&darr;</a>
 </div></header>
 
 <section id="hook"><div class="wrap">
@@ -300,6 +331,16 @@ def build():
 
   <p class="punch">So which one is true? <b>Nobody knows.</b> That is the
   whole problem, and almost nothing in this industry admits it.</p>
+
+  <div class="getline">
+    <a class="get" data-dl href="#get"
+       download="gurutva.zip">Download and run it &nbsp;&darr;</a>
+    <span class="getnote">{ZIP_KB}&nbsp;KB. Runs on your laptop.
+      Your survey is never uploaded anywhere.</span>
+  </div>
+  <div class="need">Needs Python 3.10+ with
+    <code>numpy scipy matplotlib</code>. If that is a blocker, email me and
+    I will run your survey myself.</div>
 </div></section>
 
 <section id="play"><div class="wrap">
@@ -382,14 +423,19 @@ def build():
   <div class="how">
     <h3>How you actually use it</h3>
     <ol>
-      <li>Double-click <code>Gurutva</code>. A window opens.</li>
-      <li>Choose your CSV &mdash; or press <b>Use the example</b> if you want
-        to watch it work first.</li>
-      <li>Answer three questions about your site. We do not guess them for
-        you: they are statements about your ground, not ours.</li>
-      <li>Press <b>Run</b>. About a minute later the report opens in your
-        browser, saved next to your data.</li>
+      <li>Download the zip and unpack it anywhere.</li>
+      <li>Make sure you have Python 3.10 or newer, then once:
+        <code>pip install numpy scipy matplotlib</code></li>
+      <li>Double-click <code>Gurutva.bat</code> on Windows, or run
+        <code>./gurutva</code> on Mac and Linux. A window opens.</li>
+      <li>Press <b>Use the example</b>, then <b>Run</b>, to watch it work on
+        a survey that ships with it.</li>
+      <li>Then choose your own CSV and answer three questions about your
+        site. We do not guess them for you: they are statements about your
+        ground, not ours.</li>
     </ol>
+    <p class="getline"><a class="get" data-dl href="#get"
+       download="gurutva.zip">Download gurutva.zip &nbsp;&darr;</a></p>
     <p class="whynot">There is no sign-up, no upload, and no server. It runs
     on your laptop and your data never leaves it. If a check fails it will
     tell you so and refuse to give you a number &mdash; that is the product,
