@@ -41,6 +41,16 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
+# The amplitude calibration below is a Monte-Carlo estimate of the marginal
+# sd of Q0, and it must be a pure function of Q0 — otherwise the same mesh
+# gets a slightly different prior depending on how many draws the CALLER
+# happened to take first. That is how a joint prior built from the same
+# geometry ended up disagreeing with a single-physics one by 0.35%, which is
+# small, silent, and enough to break an exactness gate. Fixed seed, fixed
+# count: the prior amplitude is now determined by the mesh alone.
+_CALIB_SEED = 20260805
+_CALIB_N = 1200
+
 
 class SmoothPrior:
     """N(0, Q^-1) for sparse SPD Q, factorised once.
@@ -108,11 +118,12 @@ def build(tree, active, prior_sd, corr_len_m, rng, n_calib=400,
                                   alpha_z=corr_len_m**2 * alpha_s)
 
     p0 = SmoothPrior(Q0)
-    sd0 = float(np.median(p0.marginal_sd(rng, n_calib)))
+    sd0 = float(np.median(p0.marginal_sd(np.random.default_rng(_CALIB_SEED),
+                                         _CALIB_N)))
     scale = (sd0 / prior_sd) ** 2          # Q -> Q*scale shrinks sd by sqrt
     return SmoothPrior(Q0, scale), dict(
         raw_median_sd=sd0, scale=scale, corr_len_m=corr_len_m,
-        declared_sd=prior_sd, n_calib=n_calib)
+        declared_sd=prior_sd, n_calib=_CALIB_N)
 
 
 # --------------------------------------------------------------- posterior
@@ -210,11 +221,13 @@ def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400,
     Q0 = (sp.eye(n, format="csr") + D.T @ D).tocsc()
 
     p0 = SmoothPrior(Q0)
-    sd0 = float(np.median(p0.marginal_sd(rng, n_calib)))
+    sd0 = float(np.median(p0.marginal_sd(np.random.default_rng(_CALIB_SEED),
+                                         _CALIB_N)))
     scale = (sd0 / prior_sd) ** 2
     return SmoothPrior(Q0, scale), dict(raw_median_sd=sd0, scale=scale,
                                         corr_len_m=corr_len_m,
-                                        declared_sd=prior_sd, n_calib=n_calib,
+                                        declared_sd=prior_sd,
+                                        n_calib=_CALIB_N,
                                         n_active=n, n_full=n_full)
 
 

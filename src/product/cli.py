@@ -54,7 +54,8 @@ from scipy.spatial import cKDTree
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src import mag_forward as mf, prism_forward as pf
 from src.gurutva_core import gates
-from src.product import prior as PR, report, survey as SV, verdict as V
+from src.product import (joint as JT, prior as PR, report,
+                         survey as SV, verdict as V)
 
 MAX_CELLS = 60_000       # laptop guard; refuse rather than swap for an hour
 
@@ -284,9 +285,32 @@ def run(args):
         G_raw = pf.prism_matrix(stations, centers[active], dims[active])
     else:
         G_raw = mf.mag_matrix(stations, centers[active], dims[active],
-                              args.b0, args.inclination, args.declination)
+                              args.b0, args.inclination, args.declination,
+                              q=args.remanence_q,
+                              rem_inclination=args.remanence_inclination,
+                              rem_declination=args.remanence_declination)
     G = G_raw / args.noise
-    prior, pmeta = PR.build_regular(shape, (args.cell,) * 3, args.prior_sd,
+
+    # PRIOR FROM THE TARGET, when one is declared. --prior-sd is a per-cell
+    # sd and correlated cells add up, so typing the contrast of the body you
+    # are hunting declares a prior hundreds of times too wide. Declaring the
+    # BODY instead fixes the amplitude from physics, and touches no observed
+    # data, so it cannot become a way of tuning until a gate turns green.
+    prior_sd, prior_source = args.prior_sd, "declared directly"
+    if args.target_contrast is not None:
+        top_z = float(stations[:, 2].max()) if args.top is None else args.top
+        amp, ncell = JT.target_anomaly_std(
+            lambda m: G_raw @ m, stations, centers[active], dims[active],
+            args.target_contrast, args.target_radius, args.target_depth, top_z)
+        prior_sd = JT.derive_prior_sd(G, shape, (args.cell,) * 3,
+                                      args.corr_len, rng, amp / args.noise,
+                                      active=active)
+        prior_source = (f"derived from a declared target: {args.target_contrast:+g} "
+                        f"{cfg['model_unit']} over {ncell} cells at "
+                        f"{args.target_depth:g} m depth, which would make a "
+                        f"{amp:.3g} {cfg['data_unit']} anomaly")
+        print(f"  prior sd {prior_sd:.4g} {cfg['model_unit']} {prior_source}")
+    prior, pmeta = PR.build_regular(shape, (args.cell,) * 3, prior_sd,
                                     args.corr_len, rng, active=active)
 
     truth = None
@@ -314,8 +338,7 @@ def run(args):
     rms = float(np.sqrt(np.mean((G_raw @ mean - d_obs) ** 2)))
 
     suite, scale_info = core_gates(G, prior, dw, rng, args.samples, mean, sd,
-                                   unit=cfg["model_unit"],
-                                   prior_sd=args.prior_sd)
+                                   unit=cfg["model_unit"], prior_sd=prior_sd)
     # Reference is what THIS model predicts of itself, not the raw noise: a
     # flexible model should fit better than the noise, and comparing to the
     # noise punishes it for being correct. See prior.expected_residual.
@@ -472,7 +495,8 @@ def run(args):
                           f"{cfg['model_unit']} out)"),
                 ("noise floor", f"{args.noise:g} {cfg['data_unit']} — YOUR "
                                 f"measurement, not our guess"),
-                ("prior sd", f"{args.prior_sd:g} {cfg['model_unit']}"),
+                ("prior sd", f"{prior_sd:.4g} {cfg['model_unit']} — "
+                             f"{prior_source}"),
                 ("prior correlation length", f"{args.corr_len:g} m"),
                 ("mesh", f"{shape[0]}x{shape[1]}x{shape[2]} at {args.cell:g} m, "
                          f"{args.depth:g} m deep, "
@@ -492,12 +516,21 @@ def run(args):
                  f"{scale_info['ratio']:.1f}x. Far from 1 means --prior-sd is "
                  f"mis-scaled: it is a PER-CELL sd and correlated cells add "
                  f"up")]
+    if args.field == "mag" and args.remanence_q:
+        declared.insert(1, ("remanence",
+                            f"Koenigsberger Q = {args.remanence_q:g}, "
+                            f"remanent direction inclination "
+                            f"{args.remanence_inclination if args.remanence_inclination is not None else args.inclination:g}, "
+                            f"declination "
+                            f"{args.remanence_declination if args.remanence_declination is not None else args.declination:g} "
+                            f"— DECLARED, not solved for"))
     if args.field == "mag":
         declared.insert(1, ("ambient field",
                             f"{args.b0:,.0f} nT, inclination "
                             f"{args.inclination:g}, declination "
-                            f"{args.declination:g} (induced magnetisation "
-                            f"only — remanence is not modelled)"))
+                            f"{args.declination:g}"
+                            + ("" if args.remanence_q else
+                               " (induced magnetisation only)")))
 
     report.render(
         out,
@@ -534,7 +567,8 @@ def run(args):
         "mode": args.mode, "field": args.field, "survey": str(args.survey),
         "status": v.status, "claimable": v.claimable, "verdict": v.headline,
         "gates": v.gates, "numbers": numbers, "geographic": geo,
-        "declared": {"noise": args.noise, "prior_sd": args.prior_sd,
+        "declared": {"noise": args.noise, "prior_sd": prior_sd,
+                     "prior_source": prior_source,
                      "corr_len": args.corr_len, "cell": args.cell,
                      "depth": args.depth, "topography": drape},
         "value": m_box * S, "value_sd": sd_box * S, "unit": cfg["out_unit"],
@@ -546,17 +580,210 @@ def run(args):
     return 0 if v.claimable else 1
 
 
+def run_joint(args):
+    """Gravity AND magnetics, coupled through a declared petrophysical
+    correlation rather than a structural penalty.
+
+    The operator stays block diagonal; the coupling lives entirely in the
+    prior covariance. That keeps the problem linear, which keeps the
+    closed-form posterior, the exact functional interval, and every gate that
+    depends on them. A cross-gradient structural term would be a stronger
+    coupling and would cost all three.
+    """
+    st_g, d_g, geo = load_survey(args.survey)
+    st_m, d_m, _ = load_survey(args.survey_mag)
+    if len(st_g) != len(st_m) or not np.allclose(st_g[:, :2], st_m[:, :2],
+                                                 atol=1.0):
+        raise SystemExit(
+            "joint mode needs both surveys at the SAME stations, in the same "
+            "order. Interpolating one onto the other invents data, and the "
+            "invented part would carry no error bar.")
+
+    drape = bool(args.topography == "on" or
+                 (args.topography == "auto"
+                  and np.ptp(st_g[:, 2]) > args.cell / 2))
+    centers, dims, shape, vol, active = build_mesh(
+        st_g, args.cell, args.depth, args.top, drape)
+    ca, va = centers[active], vol[active]
+    n = int(active.sum())
+    rng = np.random.default_rng(args.seed)
+    print(f"joint: {len(st_g)} stations x 2 physics | mesh "
+          f"{shape[0]}x{shape[1]}x{shape[2]}, {n:,} cells | "
+          f"rho-chi correlation {args.rho_chi_correlation:+g}")
+
+    gg = pf.prism_matrix(st_g, ca, dims[active])
+    gm = mf.mag_matrix(st_m, ca, dims[active], args.b0, args.inclination,
+                       args.declination, q=args.remanence_q,
+                       rem_inclination=args.remanence_inclination,
+                       rem_declination=args.remanence_declination)
+    A = JT.block_operator(gg, gm, args.noise, args.noise_mag)
+    dw = JT.stack_data(d_g, d_m, args.noise, args.noise_mag)
+    prior, pmeta = JT.build_joint_prior(
+        shape, (args.cell,) * 3, args.prior_sd, args.prior_sd_chi,
+        args.rho_chi_correlation, args.corr_len, rng, active=active)
+
+    mean = PR.posterior_mean(A, prior, dw)
+    sd, sd_err = PR.posterior_sd(A, prior, np.random.default_rng(11),
+                                 args.samples)
+    rho, chi = JT.split(mean)
+    rms_g = float(np.sqrt(np.mean((gg @ rho - d_g) ** 2)))
+    rms_m = float(np.sqrt(np.mean((gm @ chi - d_m) ** 2)))
+
+    suite, scale_info = core_gates(A, prior, dw, rng, args.samples, mean, sd,
+                                   unit="joint", prior_sd=None)
+    ref = PR.expected_residual(A, prior)
+    pp = float(np.sqrt(np.mean((A @ mean - dw) ** 2)))
+    suite.add(gates.adequacy(pp, ref))
+
+    prior_sd_cell = prior.marginal_sd(np.random.default_rng(55), 400)
+    inf_rho, inf_chi = JT.split(1.0 - sd / prior_sd_cell)
+    z = ca[:, 2]
+    edges = np.linspace(z.min(), z.max(), 20)
+    lit = [0.5 * (edges[i] + edges[i + 1]) for i in range(len(edges) - 1)
+           if np.any((z >= edges[i]) & (z < edges[i + 1]))
+           and np.percentile(inf_rho[(z >= edges[i]) & (z < edges[i + 1])],
+                             90) > 0.05]
+    z_blind = min(lit) if lit else z.max()
+
+    cx, cy = st_g[:, 0].mean(), st_g[:, 1].mean()
+    half = args.region / 2.0
+    box = ((np.abs(ca[:, 0] - cx) < half) & (np.abs(ca[:, 1] - cy) < half)
+           & (z > z_blind))
+    if not box.any():
+        raise SystemExit("the reporting region contains no cells above the "
+                         "blind depth. Widen --region.")
+    w_rho = np.concatenate([np.where(box, va, 0.0), np.zeros(n)])
+    m_box = float(w_rho @ mean)
+    sd_box = PR.functional_sd(A, prior, w_rho)
+    MT = 1e-6
+
+    # What the second dataset actually bought, in the customer's own units.
+    p_g, _ = PR.build_regular(shape, (args.cell,) * 3, args.prior_sd,
+                              args.corr_len, rng, active=active)
+    sd_alone = PR.functional_sd(gg / args.noise, p_g, np.where(box, va, 0.0))
+    tighter = (1 - sd_box / sd_alone) * 100 if sd_alone > 0 else 0.0
+
+    numbers = {
+        "excess mass in the block, from BOTH datasets":
+            f"{m_box * MT:+,.1f} Mt  (95%: {(m_box - 1.96 * sd_box) * MT:+,.1f} "
+            f"to {(m_box + 1.96 * sd_box) * MT:+,.1f})",
+        "what the magnetics bought":
+            f"the interval went from +/-{sd_alone * MT:,.1f} to "
+            f"+/-{sd_box * MT:,.1f} Mt ({tighter:.1f}% tighter)",
+        "how it got there":
+            f"a DECLARED petrophysical correlation of "
+            f"{args.rho_chi_correlation:+g} between density and "
+            f"susceptibility, and nothing else. At 0 the two inversions are "
+            f"exactly independent, which is pinned by a test. This number is "
+            f"an assumption about your rocks, not a measurement",
+        "gravity fit / magnetic fit":
+            f"{rms_g:.4g} mGal against {args.noise:g} | "
+            f"{rms_m:.4g} nT against {args.noise_mag:g}",
+        "your model is INVENTED below": f"{z_blind:,.0f} m elevation",
+        "cells informed (density / susceptibility)":
+            f"{float(np.mean(inf_rho > 0.05)) * 100:.1f}% / "
+            f"{float(np.mean(inf_chi > 0.05)) * 100:.1f}% of {n:,}",
+    }
+    v = V.assess(suite, numbers, subject=f"{Path(args.survey).name} + "
+                                        f"{Path(args.survey_mag).name}")
+    print(chr(10) + str(v))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.2), dpi=140)
+    kd = cKDTree(ca)
+    xg = np.linspace(ca[:, 0].min(), ca[:, 0].max(), 200)
+    zg = np.linspace(ca[:, 2].min(), ca[:, 2].max(), 120)
+    XX, ZZ = np.meshgrid(xg, zg)
+    dist, idx = kd.query(np.column_stack(
+        [XX.ravel(), np.full(XX.size, cy), ZZ.ravel()]))
+    outside = (dist > args.cell * 1.5).reshape(XX.shape)
+    for ax, val, ttl, cm in [
+        (axes[0], rho, "density contrast (g/cc)", "RdBu_r"),
+        (axes[1], chi, "susceptibility (SI)", "magma"),
+    ]:
+        Z = np.where(outside, np.nan, np.asarray(val)[idx].reshape(XX.shape))
+        im = ax.pcolormesh(xg / 1000, zg, Z, cmap=cm, shading="auto")
+        fig.colorbar(im, ax=ax, fraction=0.046)
+        ax.axhline(z_blind, color="r", lw=1.3, ls="--")
+        ax.set_title(ttl + " - one rock, two properties", fontsize=9)
+        ax.set_xlabel("easting (km)")
+    axes[0].set_ylabel("elevation (m)")
+    fig.tight_layout()
+    out = Path(args.out)
+    figpath = out.with_suffix(".png")
+    fig.savefig(figpath)
+    plt.close(fig)
+
+    report.render(
+        out, "Gurutva - joint verdict",
+        f"{Path(args.survey).name} + {Path(args.survey_mag).name} - "
+        f"{len(st_g)} stations, two physics",
+        v, figure=figpath,
+        caption="Density and susceptibility recovered together. They are "
+                "linked only by the declared correlation; the operator itself "
+                "stays block diagonal.",
+        headline=(f"{m_box * MT:+,.1f} Mt",
+                  f"excess mass from gravity AND magnetics, {tighter:.1f}% "
+                  f"tighter than gravity alone."),
+        version=_VERSION,
+        sections=[("What you declared",
+                   [("gravity noise", f"{args.noise:g} mGal"),
+                    ("magnetic noise", f"{args.noise_mag:g} nT"),
+                    ("density prior sd", f"{args.prior_sd:g} g/cc"),
+                    ("susceptibility prior sd", f"{args.prior_sd_chi:g} SI"),
+                    ("petrophysical correlation",
+                     f"{args.rho_chi_correlation:+g} - AN ASSUMPTION about "
+                     f"your rocks. At 0 the two inversions are independent."),
+                    ("correlation length", f"{args.corr_len:g} m"),
+                    ("unknowns", f"{pmeta['n_unknowns']:,} "
+                                 f"({n:,} cells x 2 properties)")],
+                   "The coupling lives in the prior, not in a penalty term, "
+                   "so the posterior stays closed-form and every gate still "
+                   "applies. A cross-gradient structural term would couple "
+                   "them more strongly and would cost all of that.")],
+        footer=f"Generated by <code>gurutva joint</code> - per-cell maps from "
+               f"{args.samples} posterior samples; the mass interval is "
+               f"exact, not sampled.")
+    out.with_suffix(".json").write_text(json.dumps({
+        "mode": "joint", "status": v.status, "claimable": v.claimable,
+        "verdict": v.headline, "gates": v.gates, "numbers": numbers,
+        "value": m_box * MT, "value_sd": sd_box * MT,
+        "value_sd_gravity_alone": sd_alone * MT, "tighter_pct": tighter,
+        "correlation": args.rho_chi_correlation,
+        "rms_gravity": rms_g, "rms_mag": rms_m,
+        "z_blind_m": float(z_blind), "cells": n}, indent=1))
+    print(chr(10) + f"report -> {out}")
+    return 0 if v.claimable else 1
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         prog="gurutva", description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("mode", choices=("report", "selftest"))
+    p.add_argument("mode", choices=("report", "selftest", "joint"))
     p.add_argument("--survey", required=True, help="CSV: x,y,z,gz")
     p.add_argument("--field", choices=tuple(FIELDS), default="gravity")
     p.add_argument("--noise", type=float, required=True,
                    help="MEASURED repeatability, mGal or nT. Mandatory.")
-    p.add_argument("--prior-sd", type=float, required=True,
-                   help="declared model sd: g/cc, or SI susceptibility")
+    p.add_argument("--prior-sd", type=float, default=None,
+                   help="declared per-cell model sd: g/cc, or SI "
+                        "susceptibility. Required unless --target-contrast "
+                        "is given.")
+    p.add_argument("--target-contrast", type=float, default=None,
+                   help="derive the prior from the body you are looking for")
+    p.add_argument("--target-radius", type=float, default=300.0)
+    p.add_argument("--target-depth", type=float, default=800.0)
+    p.add_argument("--remanence-q", type=float, default=0.0,
+                   help="mag: Koenigsberger ratio, remanent over induced")
+    p.add_argument("--remanence-inclination", type=float, default=None)
+    p.add_argument("--remanence-declination", type=float, default=None)
+    p.add_argument("--survey-mag", default=None,
+                   help="joint: the magnetic survey (--survey is the gravity)")
+    p.add_argument("--noise-mag", type=float, default=None,
+                   help="joint: measured repeatability of the magnetics, nT")
+    p.add_argument("--prior-sd-chi", type=float, default=None,
+                   help="joint: declared per-cell susceptibility sd")
+    p.add_argument("--rho-chi-correlation", type=float, default=0.0,
+                   help="joint: declared petrophysical correlation, -0.99..0.99")
     p.add_argument("--corr-len", type=float, required=True,
                    help="declared correlation length, m")
     p.add_argument("--b0", type=float, default=50000.0,
@@ -583,7 +810,17 @@ def main(argv=None):
     p.add_argument("--body-contrast", type=float, default=-0.3,
                    help="selftest: contrast of the planted body")
     p.add_argument("--out", default="gurutva_report.html")
-    return run(p.parse_args(argv))
+    args = p.parse_args(argv)
+    if args.prior_sd is None and args.target_contrast is None:
+        p.error("give --prior-sd, or --target-contrast to derive it")
+    if args.mode == "joint":
+        for need, why in (("survey_mag", "--survey-mag"),
+                          ("noise_mag", "--noise-mag"),
+                          ("prior_sd_chi", "--prior-sd-chi")):
+            if getattr(args, need) is None:
+                p.error(f"joint mode needs {why}")
+        return run_joint(args)
+    return run(args)
 
 
 if __name__ == "__main__":

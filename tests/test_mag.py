@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -157,3 +158,73 @@ def test_magnitude_is_in_a_believable_range_for_a_real_target():
     st = np.array([[0.0, 0.0, 0.0]])
     t = abs(mf.mag_tf(st, c, d, [0.05], 55000.0, 90.0, 0.0)[0])
     assert 1.0 < t < 500.0, f"{t:.3f} nT is not a plausible magnitude"
+
+
+# ------------------------------------------------------------- remanence
+def test_zero_koenigsberger_ratio_reproduces_induced_exactly():
+    """Adding a feature must not move the answer for everyone who does not
+    use it."""
+    c, d = _prism()
+    st = np.array([[0.0, 0.0, 0.0], [400.0, -200.0, 10.0]])
+    a = mf.mag_tf(st, c, d, [0.05], 55000.0, 65.0, 3.0)
+    b = mf.mag_tf(st, c, d, [0.05], 55000.0, 65.0, 3.0, q=0.0)
+    assert np.allclose(a, b, rtol=1e-15)
+
+
+def test_remanence_parallel_to_the_field_just_scales_the_anomaly():
+    """m_ind + Q m_rem with m_rem == m_ind is (1+Q) m_ind: same shape, bigger."""
+    c, d = _prism()
+    st = np.array([[0.0, 0.0, 0.0], [300.0, 150.0, 0.0]])
+    base = mf.mag_tf(st, c, d, [0.05], 55000.0, 65.0, 3.0)
+    q1 = mf.mag_tf(st, c, d, [0.05], 55000.0, 65.0, 3.0, q=1.0)
+    assert np.allclose(q1, 2.0 * base, rtol=1e-12)
+
+
+def test_a_reversely_magnetised_body_reads_NEGATIVE():
+    """THE reason remanence matters. A body whose remanence opposes the
+    present field with Q > 1 produces a negative anomaly over POSITIVE
+    susceptibility. An induced-only model fits that by inventing negative
+    susceptibility, which is not a rock."""
+    c, d = _prism()
+    st = np.array([[0.0, 0.0, 0.0]])
+    induced = mf.mag_tf(st, c, d, [0.05], 55000.0, 90.0, 0.0)[0]
+    reversed_ = mf.mag_tf(st, c, d, [0.05], 55000.0, 90.0, 0.0,
+                          q=3.0, rem_inclination=-90.0, rem_declination=0.0)[0]
+    assert induced > 0
+    assert reversed_ < 0, f"a reversed body must read negative, got {reversed_:.2f}"
+    # |m_ind + Q m_rem| = |1 - 3| = 2, and the direction flips
+    assert np.isclose(reversed_, -2.0 * induced, rtol=1e-12)
+
+
+def test_exactly_cancelling_magnetisation_is_refused():
+    """Q = 1 exactly antiparallel leaves the body magnetically invisible and
+    susceptibility unidentifiable. Refuse rather than divide by zero."""
+    with pytest.raises(ValueError) as e:
+        mf.magnetisation_direction(90.0, 0.0, q=1.0, rem_inclination=-90.0,
+                                   rem_declination=0.0)
+    assert "unidentifiable" in str(e.value)
+
+
+def test_oblique_remanence_changes_the_anomaly_shape_not_just_its_size():
+    """If remanence only rescaled the anomaly it would be indistinguishable
+    from susceptibility and there would be no point modelling it."""
+    c, d = _prism()
+    ys = np.linspace(-800, 800, 31)
+    st = np.column_stack([np.zeros_like(ys), ys, np.zeros_like(ys)])
+    a = mf.mag_tf(st, c, d, [0.05], 55000.0, 70.0, 0.0)
+    b = mf.mag_tf(st, c, d, [0.05], 55000.0, 70.0, 0.0, q=1.5,
+                  rem_inclination=-20.0, rem_declination=40.0)
+    shape_a, shape_b = a / np.abs(a).max(), b / np.abs(b).max()
+    assert np.max(np.abs(shape_a - shape_b)) > 0.1, "shape must change too"
+
+
+def test_project_tensor_is_symmetric_in_its_two_directions():
+    """b^T GAMMA m == m^T GAMMA b, since GAMMA is symmetric. A wrong cross
+    term would break this and nothing else would notice."""
+    c, d = _prism()
+    st = np.array([[120.0, -240.0, 0.0]])
+    cs = mf._corner_sums(st, c, d)
+    b = mf.direction(65.0, 12.0)
+    m = mf.direction(-15.0, 300.0)
+    assert np.allclose(mf.project_tensor(cs, b, m),
+                       mf.project_tensor(cs, m, b), rtol=1e-14)

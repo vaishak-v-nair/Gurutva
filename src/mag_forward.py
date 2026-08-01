@@ -33,6 +33,14 @@ The sign convention is NOT asserted from the algebra. It is pinned by a
 physical case in tests/test_mag.py: at the magnetic pole (field straight
 down), a susceptible body produces a POSITIVE total-field anomaly directly
 above it. Same discipline as `units_probe.py` used for gravity.
+
+REMANENCE is supported through the Koenigsberger ratio Q. Total magnetisation
+is chi * H0 * (m_ind + Q m_rem): once Q and the remanent direction are
+declared, the bracket is a known vector, the unknown stays a scalar per cell,
+and the problem stays linear. A reversely magnetised body (Q > 1, direction
+opposed to the field) then produces a NEGATIVE anomaly over positive
+susceptibility, which is what reversed bodies actually do and what an
+induced-only model gets badly wrong.
 """
 
 import numpy as np
@@ -113,33 +121,82 @@ def prism_tensor(stations, centers, dims):
     return T
 
 
+def magnetisation_direction(inclination, declination, q=0.0,
+                            rem_inclination=None, rem_declination=None):
+    """Unit magnetisation direction and its amplitude factor.
+
+    Total magnetisation is induced plus remanent:
+
+        M = chi * H0 * m_ind  +  M_rem * m_rem
+          = chi * H0 * (m_ind + Q * m_rem)
+
+    where Q is the Koenigsberger ratio, remanent over induced magnitude. The
+    bracket is a KNOWN vector once Q and the remanent direction are declared,
+    so the unknown stays a scalar per cell and the problem stays linear. That
+    is the whole reason to parameterise remanence this way rather than
+    inverting for a direction per cell.
+
+    Returns (unit vector, amplitude), where amplitude is |m_ind + Q m_rem| —
+    a reversely magnetised body with Q > 1 flips the sign of the anomaly,
+    which is exactly what a real reversed body does.
+    """
+    m_ind = direction(inclination, declination)
+    if q == 0.0:
+        return m_ind, 1.0
+    if rem_inclination is None:
+        rem_inclination = inclination
+    if rem_declination is None:
+        rem_declination = declination
+    v = m_ind + q * direction(rem_inclination, rem_declination)
+    amp = float(np.linalg.norm(v))
+    if amp < 1e-12:
+        raise ValueError(
+            "induced and remanent magnetisation cancel exactly (Q = 1 and "
+            "exactly antiparallel): the body would be magnetically invisible "
+            "and susceptibility is unidentifiable.")
+    return v / amp, amp
+
+
+def project_tensor(c, b, m):
+    """b^T GAMMA m from the six stored components, for ANY b and m.
+
+    The induced-only path had b == m and could use the symmetric shortcut.
+    Remanence breaks that: the field direction and the magnetisation
+    direction differ, so the cross terms need both orderings.
+    """
+    return (b[0] * m[0] * c[..., 0] + b[1] * m[1] * c[..., 1]
+            + b[2] * m[2] * c[..., 2]
+            + (b[0] * m[1] + b[1] * m[0]) * c[..., 3]
+            + (b[0] * m[2] + b[2] * m[0]) * c[..., 4]
+            + (b[1] * m[2] + b[2] * m[1]) * c[..., 5])
+
+
 def mag_matrix(stations, centers, dims, b0_nt, inclination, declination,
-               sign=-1.0):
+               sign=-1.0, q=0.0, rem_inclination=None, rem_declination=None):
     """Sensitivity matrix A: total-field anomaly in nT per unit susceptibility.
 
     dT = A @ chi, with chi in SI (dimensionless).
 
-    Induced magnetisation only: the body is magnetised along the ambient
-    field, so b_hat and m_hat are the same vector. Remanence is NOT modelled
-    and a survey over remanently magnetised rock will be misfit — that is a
-    model-class limitation the adequacy gate is there to catch, not something
-    to paper over silently.
+    With q = 0 this is induced magnetisation only: the body is magnetised
+    along the ambient field, so b_hat and m_hat coincide. Give a Koenigsberger
+    ratio q > 0 (and optionally a remanent direction) and the magnetisation
+    tilts away from the field. Because the direction is DECLARED rather than
+    solved for, the problem stays linear and the whole posterior machinery
+    applies unchanged.
 
     `sign` carries the convention, fixed by the pole test in tests/test_mag.py
     rather than asserted from the algebra.
     """
-    u = direction(inclination, declination)
+    b = direction(inclination, declination)            # what the meter reads
+    m, amp = magnetisation_direction(inclination, declination, q,
+                                     rem_inclination, rem_declination)
     c = _corner_sums(stations, centers, dims)
-    # b^T GAMMA m with b == m == u, expanded over the 6 stored components
-    proj = (u[0] * u[0] * c[..., 0] + u[1] * u[1] * c[..., 1]
-            + u[2] * u[2] * c[..., 2]
-            + 2 * u[0] * u[1] * c[..., 3]
-            + 2 * u[0] * u[2] * c[..., 4]
-            + 2 * u[1] * u[2] * c[..., 5])
-    return sign * (b0_nt / (4.0 * np.pi)) * proj
+    return sign * (b0_nt / (4.0 * np.pi)) * amp * project_tensor(c, b, m)
 
 
-def mag_tf(stations, centers, dims, chi, b0_nt, inclination, declination):
+def mag_tf(stations, centers, dims, chi, b0_nt, inclination, declination,
+           q=0.0, rem_inclination=None, rem_declination=None):
     """Total-field anomaly in nT from susceptibilities chi (SI)."""
     return mag_matrix(stations, centers, dims, b0_nt, inclination,
-                      declination) @ np.asarray(chi, dtype=float)
+                      declination, q=q, rem_inclination=rem_inclination,
+                      rem_declination=rem_declination) @ np.asarray(chi, float)

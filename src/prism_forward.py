@@ -16,6 +16,10 @@ GCC_TO_SI = 1000.0
 def prism_gz(stations: np.ndarray, centers: np.ndarray, dims: np.ndarray,
              drho: np.ndarray, chunk: int = 20000) -> np.ndarray:
     """gz (mGal, z-up) at each station from prisms (centers, dims, drho g/cc)."""
+    # Coerce: a plain list of densities used to die deep inside the corner
+    # loop with "can't multiply sequence by non-int of type float", which
+    # names neither the argument nor the caller. mag_tf already coerced.
+    drho = np.asarray(drho, dtype=float)
     out = np.zeros(len(stations))
     for s_idx, (sx, sy, sz) in enumerate(stations):
         acc = 0.0

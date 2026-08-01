@@ -1,0 +1,29 @@
+{
+ "mode": "joint",
+ "status": "PROVISIONAL",
+ "claimable": true,
+ "verdict": "PROVISIONAL \u2014 all four core gates pass, but nothing here has been checked against a known right answer. Real data has none. Run a self-test on this survey design to find out what it can actually recover. The numbers below describe demo_survey.csv + demo_magnetics.csv.",
+ "gates": [
+  "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.01424 (median < 0.115 (600-sample floor)) exact functional sd vs sampled",
+  "[PASS] stability: 0 (< 1e-09) sd ratio 1.000",
+  "[PASS] adequacy: 0.1532 (0.111 < pp < 0.996) the only gate that tests reality"
+ ],
+ "numbers": {
+  "excess mass in the block, from BOTH datasets": "+47.8 Mt  (95%: +3.2 to +92.5)",
+  "what the magnetics bought": "the interval went from +/-24.1 to +/-22.8 Mt (5.3% tighter)",
+  "how it got there": "a DECLARED petrophysical correlation of +0.7 between density and susceptibility, and nothing else. At 0 the two inversions are exactly independent, which is pinned by a test. This number is an assumption about your rocks, not a measurement",
+  "gravity fit / magnetic fit": "0.006534 mGal against 0.05 | 0.3454 nT against 2",
+  "your model is INVENTED below": "231 m elevation",
+  "cells informed (density / susceptibility)": "38.0% / 27.4% of 2,856"
+ },
+ "value": 47.839508641070005,
+ "value_sd": 22.784452357366742,
+ "value_sd_gravity_alone": 24.055396239955247,
+ "tighter_pct": 5.2834044798543145,
+ "correlation": 0.7,
+ "rms_gravity": 0.006534345940581408,
+ "rms_mag": 0.34544137079391457,
+ "z_blind_m": 231.4661052631579,
+ "cells": 2856
+}

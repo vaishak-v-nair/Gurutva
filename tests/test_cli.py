@@ -282,7 +282,7 @@ def test_magnetic_survey_runs_end_to_end(tmp_path):
               "--samples", "120", "--out", str(out)])
     html = out.read_text(encoding="utf-8")
     assert "susceptibility" in html and "nT" in html
-    assert "remanence is not modelled" in html, "state the model-class limit"
+    assert "induced magnetisation only" in html, "state the model-class limit"
 
 
 def test_lon_lat_input_gives_the_same_answer_as_projected_metres(tmp_path):
@@ -387,3 +387,142 @@ def test_every_core_gate_actually_runs(tmp_path):
     for gate in ("licensing", "calibration", "stability", "adequacy"):
         assert gate in html, f"core gate {gate} never ran"
     assert "INCOMPLETE" not in html
+
+
+# ------------------------- remanence, derived priors, joint inversion (CLI)
+def _mag_survey(tmp_path, name="mag.csv", q=0.0, rem_inc=None):
+    from src import mag_forward as mf
+    x, y = _grid_xyz()
+    z = np.full(x.size, 1650.0)
+    st = np.column_stack([x, y, z])
+    c = np.array([[x.mean(), y.mean(), -700.0]])
+    d = np.array([[400.0, 400.0, 400.0]])
+    t = mf.mag_tf(st, c, d, [0.05], 55000.0, 70.0, 2.0, q=q,
+                  rem_inclination=rem_inc)
+    t = t + np.random.default_rng(7).normal(0, 1.0, x.size)
+    return _write_rows(tmp_path, name, "x,y,z,tmi", [x, y, z, t]), st
+
+
+MAGBASE = ["--field", "mag", "--noise", "1.0", "--corr-len", "400",
+           "--cell", "300", "--depth", "1200", "--b0", "55000",
+           "--inclination", "70", "--declination", "2", "--samples", "120"]
+
+
+def test_prior_can_be_derived_from_a_declared_target(tmp_path):
+    """--prior-sd is a per-cell sd, so typing the contrast of the body you
+    are hunting declares a prior hundreds of times too wide. Declaring the
+    BODY instead fixes the amplitude from physics."""
+    p, _ = _mag_survey(tmp_path)
+    out = tmp_path / "t.html"
+    cli.main(["report", "--survey", p] + MAGBASE
+             + ["--target-contrast", "0.05", "--target-radius", "400",
+                "--target-depth", "700", "--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    assert "derived from a declared target" in html
+    assert "would make a" in html and "nT anomaly" in html
+
+
+def test_prior_sd_or_a_target_is_required(tmp_path):
+    """One of the two must be given: the tool never invents an amplitude."""
+    p, _ = _mag_survey(tmp_path)
+    with pytest.raises(SystemExit):
+        cli.main(["report", "--survey", p, "--field", "mag", "--noise", "1.0",
+                  "--corr-len", "400"])
+
+
+def test_remanence_is_declared_in_the_report(tmp_path):
+    """A declared magnetisation direction is an assumption the reader must
+    see, not a hidden default."""
+    p, _ = _mag_survey(tmp_path, q=2.0, rem_inc=-60.0)
+    out = tmp_path / "r.html"
+    cli.main(["report", "--survey", p] + MAGBASE
+             + ["--prior-sd", "3e-4", "--remanence-q", "2.0",
+                "--remanence-inclination", "-60", "--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    assert "Koenigsberger" in html and "DECLARED, not solved for" in html
+    assert "induced magnetisation only" not in html
+
+
+def test_induced_only_still_says_so(tmp_path):
+    p, _ = _mag_survey(tmp_path)
+    out = tmp_path / "i.html"
+    cli.main(["report", "--survey", p] + MAGBASE
+             + ["--prior-sd", "3e-4", "--out", str(out)])
+    assert "induced magnetisation only" in out.read_text(encoding="utf-8")
+
+
+def _pair(tmp_path):
+    """A gravity and a magnetic survey at the SAME stations."""
+    from src import mag_forward as mf, prism_forward as pf
+    x, y = _grid_xyz()
+    z = np.full(x.size, 1650.0)
+    st = np.column_stack([x, y, z])
+    c = np.array([[x.mean(), y.mean(), -700.0]])
+    d = np.array([[400.0, 400.0, 400.0]])
+    rng = np.random.default_rng(8)
+    g = pf.prism_gz(st, c, d, [0.3]) + rng.normal(0, 0.01, x.size)
+    t = mf.mag_tf(st, c, d, [0.05], 55000.0, 70.0, 2.0) + rng.normal(0, 1.0, x.size)
+    return (_write_rows(tmp_path, "g.csv", "x,y,z,gz", [x, y, z, g], "%.5f"),
+            _write_rows(tmp_path, "m.csv", "x,y,z,tmi", [x, y, z, t], "%.5f"))
+
+
+JBASE = ["--noise", "0.01", "--noise-mag", "1.0", "--prior-sd", "0.05",
+         "--prior-sd-chi", "3e-4", "--corr-len", "400", "--cell", "300",
+         "--depth", "1200", "--b0", "55000", "--inclination", "70",
+         "--samples", "120"]
+
+
+def test_joint_inversion_runs_and_reports_both_properties(tmp_path):
+    g, m = _pair(tmp_path)
+    out = tmp_path / "j.html"
+    cli.main(["joint", "--survey", g, "--survey-mag", m] + JBASE
+             + ["--rho-chi-correlation", "0.7", "--out", str(out)])
+    html = out.read_text(encoding="utf-8")
+    assert "density" in html and "susceptibility" in html
+    assert "AN ASSUMPTION about" in html, "the correlation must be flagged"
+
+
+def test_joint_at_zero_correlation_buys_exactly_nothing(tmp_path):
+    """The product-level twin of the exactness gate in test_joint.py: with
+    the two properties declared unrelated, adding magnetics cannot narrow a
+    density interval by even a rounding error."""
+    import json
+    g, m = _pair(tmp_path)
+    out = tmp_path / "j0.html"
+    cli.main(["joint", "--survey", g, "--survey-mag", m] + JBASE
+             + ["--rho-chi-correlation", "0.0", "--out", str(out)])
+    j = json.loads(out.with_suffix(".json").read_text())
+    assert abs(j["tighter_pct"]) < 0.05, f"bought {j['tighter_pct']:.3f}%"
+
+
+def test_joint_with_correlation_narrows_the_interval(tmp_path):
+    import json
+    g, m = _pair(tmp_path)
+    vals = {}
+    for r in ("0.0", "0.8"):
+        out = tmp_path / f"j{r}.html"
+        cli.main(["joint", "--survey", g, "--survey-mag", m] + JBASE
+                 + ["--rho-chi-correlation", r, "--out", str(out)])
+        vals[r] = json.loads(out.with_suffix(".json").read_text())["value_sd"]
+    assert vals["0.8"] < vals["0.0"], "a declared correlation must buy something"
+
+
+def test_joint_refuses_surveys_at_different_stations(tmp_path):
+    """Interpolating one survey onto the other invents data, and the invented
+    part would carry no error bar."""
+    g, m = _pair(tmp_path)
+    x, y = _grid_xyz(n_x=7, n_y=5)
+    z = np.full(x.size, 1650.0)
+    bad = _write_rows(tmp_path, "bad.csv", "x,y,z,tmi",
+                      [x + 40.0, y, z, np.zeros(x.size)])
+    with pytest.raises(SystemExit) as e:
+        cli.main(["joint", "--survey", g, "--survey-mag", bad] + JBASE
+                 + ["--out", str(tmp_path / "x.html")])
+    assert "SAME stations" in str(e.value)
+
+
+def test_joint_mode_requires_its_extra_inputs(tmp_path):
+    g, m = _pair(tmp_path)
+    with pytest.raises(SystemExit):
+        cli.main(["joint", "--survey", g, "--noise", "0.01",
+                  "--prior-sd", "0.05", "--corr-len", "400"])

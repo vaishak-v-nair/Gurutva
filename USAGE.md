@@ -64,7 +64,36 @@ Optional: `--cell` (default 200 m), `--depth` (2000 m), `--region` (side of the 
 py -3 -m src.product.cli report --survey examples/demo_magnetics.csv --field mag --noise 2.0 --prior-sd 3e-4 --corr-len 400 --b0 55000 --inclination 70 --declination 2 --out mag.html
 ```
 
-Data in nT, model out in SI susceptibility. `--b0`, `--inclination` (positive **down**) and `--declination` (east of north) describe your ambient field. **Induced magnetisation only** — remanence is not modelled, so a survey over remanently magnetised rock will be misfit. The report says so, and the adequacy gate is what catches it.
+Data in nT, model out in SI susceptibility. `--b0`, `--inclination` (positive **down**) and `--declination` (east of north) describe your ambient field.
+
+**Remanence.** If the rock carries remanent magnetisation, add `--remanence-q` (the Koenigsberger ratio, remanent over induced) and optionally `--remanence-inclination` / `--remanence-declination`. Because the direction is *declared* rather than solved for, the problem stays linear and every gate still applies. A reversely magnetised body then reads negative over positive susceptibility, which is what reversed bodies actually do — an induced-only model fits that by inventing negative susceptibility, which is not a rock. The report states the declared values; without `--remanence-q` it says "induced magnetisation only".
+
+### Do not guess the prior amplitude — declare the target
+
+```bash
+py -3 -m src.product.cli report --survey mysurvey.csv --field mag --noise 2.0 --corr-len 400 --target-contrast 0.06 --target-radius 300 --target-depth 700 --out r.html
+```
+
+Instead of `--prior-sd`, describe **the body you are looking for**. The prior amplitude is then derived from the anomaly that body would make:
+
+```
+prior sd 0.001549 SI susceptibility derived from a declared target:
++0.06 SI over 21 cells at 700 m depth, which would make a 46.9 nT anomaly
+```
+
+This uses only declared physics and never looks at your data, so it cannot become a way of tuning until a gate turns green. If adequacy then fails, that is the tool telling you the body you are hunting is not in this data.
+
+### Joint gravity + magnetic inversion
+
+```bash
+py -3 -m src.product.cli joint --survey grav.csv --survey-mag mag.csv --noise 0.05 --noise-mag 2.0 --prior-sd 0.10 --prior-sd-chi 3e-4 --rho-chi-correlation 0.7 --corr-len 400 --out joint.html
+```
+
+Both surveys must be at the **same stations, in the same order** — interpolating one onto the other invents data, and the invented part would carry no error bar.
+
+The two physics are coupled through one declared number: `--rho-chi-correlation`, the petrophysical correlation between density and susceptibility. That coupling lives in the prior, not in a penalty term, so the posterior stays closed-form and every gate still applies.
+
+**At `0.0` the two inversions are exactly independent** — pinned by a test, and the report will say the magnetics bought 0.0%. Turn it up and the magnetics start informing density. On the example data, `0.7` narrows the mass interval by 5.3% and moves the estimate from +25.1 to +47.8 Mt. **That movement is your assumption doing work, not a measurement**, and the report labels it as such.
 
 ### Your own ground, not a box we chose
 
