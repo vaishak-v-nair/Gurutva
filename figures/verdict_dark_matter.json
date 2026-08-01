@@ -6,7 +6,7 @@
   "[PASS] calibration(MC): 0.01027 (median rel err < 2%) closed form vs 8k Matheron samples",
   "[PASS] stability: 0 (< 1e-06) sd ratio 1.000",
   "[PASS] adequacy: 0.02062 (0.01 < pp < 0.09) the only gate that tests reality",
-  "[FAIL] recovery: 0.3819 (cover >= 0.90 and worst miss <= 3 sigma) worst 4.9 sigma \u2014 the gate the other four cannot be"
+  "[FAIL] recovery: 0.3819 (cover >= 0.90 and worst miss <= 4.10 sigma (n=576)) worst 4.9 sigma \u2014 the gate the other four cannot be"
  ],
  "numbers": {
   "THE ONE NUMBER THAT SURVIVES \u2014 95% exclusion": "kappa < 0.042 where nothing is detected. Every bias measured here pushes the estimate DOWN, which makes an upper limit conservative rather than optimistic. This is the quantity a search publishes, and it is the same array a mining report calls drill risk",

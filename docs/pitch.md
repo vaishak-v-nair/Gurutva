@@ -50,7 +50,7 @@ Both were caught by our own gates, on our own work, before anyone else saw it.
 
 **If you run surveys** — give us one dataset and the model you already produced from it. We return the verdict report you saw above, on your data. No charge for the first one. If the answer is "your survey cannot support this decision," that is what you will get, and it is worth knowing before the drill moves.
 
-**If you work on this problem** — the repository has 72 passing tests and I will give you access. The retractions are in there too: a headline we withdrew within four hours, a fix that failed on physical grounds, six separate times a threshold was set below its own sampling floor. Tear it apart. We would rather be corrected than agreed with.
+**If you work on this problem** — the repository has 79 passing tests and I will give you access. The retractions are in there too: a headline we withdrew within four hours, a fix that failed on physical grounds, six separate times a threshold was set below its own sampling floor. Tear it apart. We would rather be corrected than agreed with.
 
 ---
 

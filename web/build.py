@@ -9,6 +9,7 @@ Run: py -3 web/build.py
 
 import base64
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +19,12 @@ OUT = ROOT / "web" / "index.html"
 geo = json.loads((FIG / "verdict_geothermal.json").read_text())
 ccs = json.loads((FIG / "verdict_carbon_storage.json").read_text())
 dm = json.loads((FIG / "verdict_dark_matter.json").read_text())
-N_TESTS = 72          # keep in step with the suite
+# Counted, not typed. A hand-maintained number on a page whose whole claim is
+# "every figure here comes from a run that happened" is exactly the stale
+# claim this script exists to make impossible — and it had already drifted
+# (72 written, 79 actual) within one commit of being introduced.
+N_TESTS = sum(len(re.findall(r"^def test_", f.read_text(encoding="utf-8"), re.M))
+              for f in sorted((ROOT / "tests").glob("test_*.py")))
 REPO = "https://github.com/vaishak-v-nair/Gurutva"   # PRIVATE — do not link publicly
 
 
