@@ -1,6 +1,6 @@
 # How to use Gurutva
 
-You have a gravity survey. You want to know what it actually supports before you spend money on it. That is the whole product.
+You have a gravity or magnetic survey. You want to know what it actually supports before you spend money on it. That is the whole product.
 
 ## 1. Put your survey in a CSV
 
@@ -56,7 +56,41 @@ You get `report.html` (open it in a browser) and `report.json` (for your own scr
 | `--prior-sd` | how much density varies at your site, g/cc | this is geology, not software. Take it from your own logs or report |
 | `--corr-len` | the scale your rock varies over, m | rock is connected; a prior that treats each cell as a stranger cannot make the signal a real basin makes |
 
-Optional: `--cell` (default 200 m), `--depth` (2000 m), `--region` (side of the block the mass is reported for, 2000 m), `--samples` (600).
+Optional: `--cell` (default 200 m), `--depth` (2000 m), `--region` (side of the block the result is reported for, 2000 m), `--samples` (600).
+
+### Magnetics
+
+```bash
+py -3 -m src.product.cli report --survey examples/demo_magnetics.csv --field mag --noise 2.0 --prior-sd 3e-4 --corr-len 400 --b0 55000 --inclination 70 --declination 2 --out mag.html
+```
+
+Data in nT, model out in SI susceptibility. `--b0`, `--inclination` (positive **down**) and `--declination` (east of north) describe your ambient field. **Induced magnetisation only** — remanence is not modelled, so a survey over remanently magnetised rock will be misfit. The report says so, and the adequacy gate is what catches it.
+
+### Your own ground, not a box we chose
+
+```bash
+py -3 -m src.product.cli report --survey mysurvey.csv --region-file mylease.csv --noise 0.05 --prior-sd 0.1 --corr-len 400 --out r.html
+```
+
+`mylease.csv` is just vertices: a header of `x,y` (metres) or `lon,lat` (degrees), then one row per corner. Concave shapes work and the ring closes itself. The report names the block and its area.
+
+### Topography
+
+The mesh top is draped to your station elevations by default whenever the relief is more than half a cell. Force it with `--topography on` or `off`.
+
+This matters more than it sounds. With a flat-topped mesh over a valley the inversion is handed air to put density into, and it will. On the 667 m relief example, draping drops 535 of 2,856 cells and **tightens** the reported interval from ±46 to ±36 Mt, because mass that could have hidden in the air is gone.
+
+### If the prior-scale warning fires
+
+`--prior-sd` is a **per-cell** standard deviation, and thousands of correlated cells add up. Hunting a body of susceptibility 0.06 and typing `--prior-sd 0.06` declares a prior predicting hundreds of nT over a survey that reads single digits. The tool measures this and tells you what to use instead:
+
+```
+WARNING: your declared prior predicts data with spread 889 but yours has 2.12 (419x too wide).
+         --prior-sd is a PER-CELL sd and correlated cells add up.
+         For this survey try about 0.00014 SI susceptibility.
+```
+
+Take that as a starting point, then check it against your rocks. It is a scale hint, not a licence to tune until a gate turns green.
 
 **Declare these from your site. Never tune them until a gate turns green.** That is the one rule. If a gate fails, the honest move is to report the failure, not to adjust the inputs until it passes.
 
@@ -64,14 +98,14 @@ Optional: `--cell` (default 200 m), `--depth` (2000 m), `--region` (side of the 
 
 **The verdict line, first.** One of:
 
-- `CLAIMABLE — four core gates pass. RECOVERY UNTESTED` — the normal result on real data. The four checks passed, and nothing was compared against a known right answer, because on real data there isn't one. Run `selftest` to cover that gap.
-- `CLAIMABLE — ... recovery verified against a known truth` — only from `selftest`.
-- `NOT CLAIMED — failed: <gate>` — everything below it is a diagnostic. Do not put it in a decision.
+- **`PROVISIONAL`** (amber) — the normal result on real data. All four core gates passed, and nothing was checked against a known right answer, because real data has none. Run `selftest` to close that gap.
+- **`CLAIMABLE`** (green) — all four core gates passed **and** the result was verified against a known truth. Only `selftest` can reach this.
+- **`NOT CLAIMED`** (red) — a gate failed. Everything below it is a diagnostic. Do not put it in a decision.
 
-**Then the three numbers:**
+**Then the numbers:**
 
-1. **Excess mass in the block, with a 95% interval.** If the interval spans zero you have no detection — and the upper limit tells you the most that could be hiding there.
-2. **The depth below which your model is invented.** Deeper than that, the typical cell is your prior, not your data.
+1. **The quantity in your block, with a 95% interval** — excess mass in Mt for gravity, mean susceptibility for magnetics. If the interval spans zero you have no detection, and the upper limit tells you the most that could be hiding there.
+2. **The depth below which nothing is constrained**, and separately the depth below which the *typical* cell is not. Those differ: a compact magnetic body lights a handful of cells to 87% while the median cell sits at 1.3%, which means per-cell values are not a map.
 3. **What the per-cell shortcut would have said.** Usually 2 to 3 times too tight. Neighbouring cells trade off against each other, so the variance of a sum is not the sum of variances.
 
 ## 6. The gates, one line each
