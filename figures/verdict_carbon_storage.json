@@ -1,0 +1,64 @@
+{
+ "claimable": true,
+ "verdict": "CLAIMABLE \u2014 all four gates pass. The numbers below for this monitoring programme are supported by the data.",
+ "gates": [
+  "[PASS] licensing: 0 (< 95.0 pct) observation must be plausible under the prior",
+  "[PASS] calibration(MC): 0.02091 (median < 0.100 (800-sample floor)) exact functional sd vs sampled",
+  "[PASS] stability: 0 (< 1e-09) sd ratio 1.000",
+  "[PASS] adequacy: 0.001302 (0.001 < pp < 0.009) the only gate that tests reality"
+ ],
+ "numbers": {
+  "CO2 accounted for inside the complex": "7.4 +/- 7.1 Mt   (declared injected: 10.0 Mt)",
+  "inventory reconciles?": "YES \u2014 the declared inventory sits inside the 95% interval",
+  "CONTAINMENT \u2014 smallest leak this survey can detect": "5.21 Mt in a 400 m body 2 km out \u2014 but only if that body is at least 72% saturated",
+  "so an emptier leak of that size is invisible": "a 400 m body below 72% saturation cannot be ruled out at all, and no containment claim covers it",
+  "the recovered picture, judged honestly": "the posterior mean exceeds the physical saturation ceiling in 0% of cells \u2014 a Gaussian prior is unbounded, so the MAP picture is not physical. The mass limits are integrals and stay valid; being unbounded makes them conservative, never optimistic",
+  "the honest limit of gravity ALONE": "per-column sigma is ~0.9 Mt against a peak column of 0.15 Mt \u2014 this survey constrains INTEGRALS, not maps. That is why Sleipner runs gravity alongside seismic, and any claim to map a plume from 30 benchmarks alone would be the prior talking",
+  "what a whole-area bound would have said": "< 106 Mt outside \u2014 REFUSED, it is 1065% of the injected mass and is set by the prior, not the data",
+  "upgrading 3.0 -> 1.1 uGal (Sleipner's 2013 repeatability)": "inventory +/-7.1 -> +/-6.2 Mt; 400 m leak threshold 5.21 -> 4.90 Mt (6% better for a 2.7x quieter instrument \u2014 this survey is limited by its geometry, not its noise)"
+ },
+ "prior": {
+  "raw_median_sd": 0.12230633450940054,
+  "scale": 0.9422297468584896,
+  "corr_len_m": 500.0,
+  "declared_sd": 0.126,
+  "n_calib": 400
+ },
+ "co2_inside_Mt": 7.3676296160101655,
+ "co2_inside_sd_Mt": 7.073230270074027,
+ "area_bound_REFUSED_Mt": 106.45257459536708,
+ "leak_scan": [
+  {
+   "radius_m": 400.0,
+   "detectable_Mt": 5.214901218437059,
+   "ceiling_Mt": 7.2576,
+   "visible": true
+  },
+  {
+   "radius_m": 600.0,
+   "detectable_Mt": 7.9923973262939665,
+   "ceiling_Mt": 19.3536,
+   "visible": true
+  },
+  {
+   "radius_m": 800.0,
+   "detectable_Mt": 9.294902849830104,
+   "ceiling_Mt": 31.4496,
+   "visible": true
+  },
+  {
+   "radius_m": 1200.0,
+   "detectable_Mt": 13.967995681194795,
+   "ceiling_Mt": 65.31840000000001,
+   "visible": true
+  }
+ ],
+ "min_detectable_400m_Mt": 5.214901218437059,
+ "ceiling_400m_Mt": 7.2576,
+ "inventory_sd_at_1p1uGal_Mt": 6.245667452479399,
+ "injected_Mt": 10.0,
+ "rms_uGal": 1.3020855118773054,
+ "noise_uGal": 3.0,
+ "prior_sd_gcc": 0.126,
+ "data": "SIMULATED from a declared plume; Sleipner survey parameters only"
+}

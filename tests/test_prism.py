@@ -70,3 +70,24 @@ def test_published_model_all_cells_classified():
     assert set(np.unique(dims[:, 2])) == {30.0, 60.0, 120.0}
     levels = {(50.0, 30.0), (100.0, 60.0), (200.0, 120.0)}
     assert set(map(tuple, np.unique(dims[:, [0, 2]], axis=0))) == levels
+
+
+def test_prism_matrix_matches_the_scalar_forward():
+    """G @ rho must equal prism_gz(rho) exactly — one physics, two callers.
+    Pins the matrix builder to the already-gated scalar path so the pi-leak
+    fix cannot silently regress in only one of them."""
+    import numpy as np
+    from src import prism_forward as pf
+
+    rng = np.random.default_rng(11)
+    centers = np.column_stack([rng.uniform(-500, 500, 40),
+                               rng.uniform(-500, 500, 40),
+                               rng.uniform(-900, -700, 40)])
+    dims = np.tile([100.0, 100.0, 25.0], (40, 1))
+    stations = np.column_stack([rng.uniform(-300, 300, 7),
+                                rng.uniform(-300, 300, 7),
+                                np.zeros(7)])
+    rho = rng.normal(0, 0.2, 40)
+    G = pf.prism_matrix(stations, centers, dims)
+    assert np.allclose(G @ rho, pf.prism_gz(stations, centers, dims, rho),
+                       rtol=1e-12, atol=1e-14)

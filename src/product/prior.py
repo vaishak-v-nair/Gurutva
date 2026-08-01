@@ -10,7 +10,8 @@ description of geology, and the two priors in common use are not:
      until the misfit hits a target implies, at Utah FORGE, that rock
      density varies by 0.021 g/cc. Measured: licensing fails at the 100th
      percentile — that prior could not have produced the anomaly that was
-     actually measured — and the reported error bar comes out ~9x too tight.
+     actually measured — and against the licensed prior it still under-states
+     the error bar on box mass (2.6x on the Utah demo's box).
 
   2. a flat, independent-per-cell prior at a physical amplitude (0.25 g/cc,
      the published report's own basin contrast). Defensible per cell, and
@@ -148,3 +149,44 @@ def posterior_sd(G, prior, rng, n=600):
     fl = m - SGt @ np.linalg.solve(K, G @ m + eps)
     sd = fl.std(axis=1)
     return sd, sd / np.sqrt(2.0 * (n - 1))
+
+
+def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400):
+    """Same declared prior on a regular 3D grid (nx, ny, nz).
+
+    The TreeMesh path above borrows SimPEG's regularization operators; a
+    regular grid does not need them, so the smallness + first-difference
+    precision is assembled directly:
+
+        Q0 = I + L^2 * sum_axis D_axis^T D_axis
+
+    with D the forward difference along each axis in CELL units, scaled by
+    (corr_len / spacing) so the correlation length is a physical length and
+    not an accident of the mesh. Amplitude is then calibrated exactly as in
+    build(), so both paths mean the same thing by "0.25 g/cc at 500 m".
+    """
+    nx, ny, nz = shape
+    n = nx * ny * nz
+    idx = np.arange(n).reshape(shape)
+
+    rows = []
+    for axis, h in zip(range(3), spacing):
+        a = np.moveaxis(idx, axis, 0)
+        if a.shape[0] < 2:
+            continue
+        i0, i1 = a[:-1].ravel(), a[1:].ravel()
+        m = len(i0)
+        w = corr_len_m / h                    # dimensionless smoothing weight
+        rows.append(sp.csr_matrix(
+            (np.concatenate([w * np.ones(m), -w * np.ones(m)]),
+             (np.concatenate([np.arange(m), np.arange(m)]),
+              np.concatenate([i0, i1]))), shape=(m, n)))
+    D = sp.vstack(rows).tocsr()
+    Q0 = (sp.eye(n, format="csr") + D.T @ D).tocsc()
+
+    p0 = SmoothPrior(Q0)
+    sd0 = float(np.median(p0.marginal_sd(rng, n_calib)))
+    scale = (sd0 / prior_sd) ** 2
+    return SmoothPrior(Q0, scale), dict(raw_median_sd=sd0, scale=scale,
+                                        corr_len_m=corr_len_m,
+                                        declared_sd=prior_sd, n_calib=n_calib)

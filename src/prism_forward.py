@@ -52,3 +52,39 @@ def prism_gz(stations: np.ndarray, centers: np.ndarray, dims: np.ndarray,
         # is z-up (pinned against SimPEG by tests/test_prism.py)
         out[s_idx] = -acc * SI_TO_MGAL
     return out
+
+
+def prism_matrix(stations: np.ndarray, centers: np.ndarray,
+                 dims: np.ndarray) -> np.ndarray:
+    """Sensitivity matrix G (n_stations x n_cells), mGal per g/cc.
+
+    Same Nagy corner formula and the same principal-branch arctan as
+    prism_gz — kept as one code path in spirit and pinned to it by test, so
+    the pi-leak bug (arctan2's extended range breaking the 8-corner
+    cancellation, a factor of -pi x 10^4) cannot reappear in only one of
+    them.
+    """
+    G = np.empty((len(stations), len(centers)))
+    for s_idx, (sx, sy, sz) in enumerate(stations):
+        x = np.stack([centers[:, 0] - dims[:, 0] / 2 - sx,
+                      centers[:, 0] + dims[:, 0] / 2 - sx], axis=1)
+        y = np.stack([centers[:, 1] - dims[:, 1] / 2 - sy,
+                      centers[:, 1] + dims[:, 1] / 2 - sy], axis=1)
+        z = np.stack([centers[:, 2] - dims[:, 2] / 2 - sz,
+                      centers[:, 2] + dims[:, 2] / 2 - sz], axis=1)
+        acc = np.zeros(len(centers))
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    sgn = (-1.0) ** (i + j + k)
+                    xi, yj, zk = x[:, i], y[:, j], z[:, k]
+                    rr = np.sqrt(xi**2 + yj**2 + zk**2)
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        at = np.arctan(xi * yj / (zk * rr))
+                    at = np.nan_to_num(at)
+                    term = (zk * at
+                            - xi * np.log(np.maximum(rr + yj, 1e-300))
+                            - yj * np.log(np.maximum(rr + xi, 1e-300)))
+                    acc += sgn * term
+        G[s_idx] = -acc * G_SI * GCC_TO_SI * SI_TO_MGAL
+    return G
