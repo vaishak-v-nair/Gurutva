@@ -1,0 +1,4 @@
+#!/bin/sh
+# Double-click or run: ./gurutva
+cd "$(dirname "$0")"
+exec python3 -m src.product.app
