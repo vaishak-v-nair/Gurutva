@@ -3,3 +3,5 @@ __pycache__/
 .pytest_cache/
 # datasets are fetched, not committed — provenance lives in the README
 data/
+
+data/sleipner/*.zip
