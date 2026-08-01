@@ -195,3 +195,23 @@ Five-year horizon: the page must still be true after the product improves. Nothi
 ## 16. Bugs caught by looking at the rendered page
 
 - **The page scrolled sideways.** Grid children default to `min-width:auto`, so a 520px-wide figure refused to let its column shrink and pushed the whole body wide instead of scrolling inside its own container. Fixed with `.two>*{min-width:0}`. This is exactly the failure §6 said must never happen, and it happened anyway — reviewing the spec would never have found it.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | not run for this plan |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | not run |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | not run for this plan |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (FULL) | score: 6/10 → 9/10, 6 decisions |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |
+
+Pass scores: Information architecture 6→9 · Interaction states 2→9 · User journey 3→9 · AI-slop risk 7→9 · Design system 4→9 · Responsive & accessibility 1→9 · Unresolved decisions 4 raised, 4 resolved.
+
+Hard rejections: none. All seven litmus checks pass — the first screen is the product's own output, so the brand is unmistakable and there is exactly one visual anchor.
+
+Two findings came from the rendered page rather than the spec, and both are recorded above: the body scrolled sideways because grid children default to `min-width:auto` (§16), and the light-only decision in §14 was overruled once the page was seen against a dark ground (§15.2).
+
+**VERDICT:** DESIGN CLEARED — plan at 9/10, page and pitch shipped and committed at `8df5e4a`. Eng review not run for this plan; it is a static page with no application code, so the required gate applies to `src/` rather than to `web/`.
+
+NO UNRESOLVED DECISIONS
