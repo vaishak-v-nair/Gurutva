@@ -54,18 +54,81 @@ MAX_CELLS = 60_000       # laptop guard; refuse rather than swap for an hour
 
 
 def load_survey(path):
-    rows = np.genfromtxt(path, delimiter=",", names=True, dtype=float)
-    need = ("x", "y", "z", "gz")
-    missing = [c for c in need if c not in (rows.dtype.names or ())]
+    """Read x,y,z,gz and REFUSE anything it cannot honestly invert.
+
+    Every guard below is here because a hostile pass over the CLI hit it:
+    a semicolon-delimited export (the European default) died inside
+    genfromtxt, a UTF-8 BOM turned the first column into "﻿x" so the
+    error blamed a missing x, a single NaN sailed through and was caught
+    three gates later by luck, and a collinear survey crashed in the sparse
+    factoriser with "zero-size array to reduction operation minimum".
+
+    A tool aimed at people who are not programmers has to fail at the door,
+    in their language, naming the row.
+    """
+    raw = Path(path).read_text(encoding="utf-8-sig", errors="replace")  # eats BOM
+    head = raw.splitlines()[0] if raw.strip() else ""
+    delim = max((",", ";", "\t"), key=lambda c: head.count(c))
+    if head.count(delim) < 3:
+        raise SystemExit(
+            f"{path}: could not find 4 columns in the header line.\n"
+            f"  got: {head[:70]!r}\n"
+            f"  need: x,y,z,gz  (comma, semicolon or tab separated)")
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")          # we report the errors ourselves
+        rows = np.genfromtxt(raw.splitlines(), delimiter=delim, names=True,
+                             dtype=float, invalid_raise=False)
+    body = [ln for ln in raw.splitlines()[1:] if ln.strip()]
+    if rows.size == 0 and body:
+        others = {c: body[0].count(c) for c in (",", ";", "\t") if c != delim}
+        alt = max(others, key=others.get) if others else None
+        raise SystemExit(
+            f"{path}: the header is separated by {delim!r} but no data row "
+            f"could be read that way.\n"
+            f"  first data line: {body[0][:70]!r}\n"
+            + (f"  It looks {alt!r}-separated. Make the header match the data."
+               if alt and others[alt] >= 3 else
+               "  Header and data must use the same separator."))
+    names = tuple(n.strip().lower() for n in (rows.dtype.names or ()))
+    rows.dtype.names = names
+    missing = [c for c in ("x", "y", "z", "gz") if c not in names]
     if missing:
         raise SystemExit(
-            f"{path}: missing column(s) {', '.join(missing)}. "
-            f"Required header: x,y,z,gz  (metres, metres, metres, mGal)")
+            f"{path}: missing column(s) {', '.join(missing)}.\n"
+            f"  found: {', '.join(names) or '(none)'}\n"
+            f"  need:  x,y,z,gz  (metres, metres, metres, mGal)")
+
     st = np.column_stack([rows["x"], rows["y"], rows["z"]]).astype(float)
     d = np.asarray(rows["gz"], dtype=float)
+
+    bad = ~np.isfinite(np.column_stack([st, d[:, None]])).all(axis=1)
+    if bad.any():
+        first = int(np.argmax(bad)) + 2          # +2: 1-based, past the header
+        raise SystemExit(
+            f"{path}: {int(bad.sum())} row(s) contain a blank or non-numeric "
+            f"value; the first is line {first}.\n"
+            f"  Gurutva will not guess a missing reading. Remove those rows "
+            f"or fill them in.")
     if len(st) < 8:
         raise SystemExit(f"{path}: only {len(st)} stations. Too few to say "
                          "anything honest about a 3-D density field.")
+
+    ext_x = st[:, 0].max() - st[:, 0].min()
+    ext_y = st[:, 1].max() - st[:, 1].min()
+    if min(ext_x, ext_y) <= 0:
+        raise SystemExit(
+            f"{path}: the stations span {ext_x:,.0f} m east-west and "
+            f"{ext_y:,.0f} m north-south.\n"
+            f"  A survey along a single line cannot constrain a 3-D density "
+            f"field — there is no second horizontal direction for the data to "
+            f"resolve. Use a 2-D layout, or a profile-specific tool.")
+
+    uniq = len({(round(a, 3), round(b, 3)) for a, b in st[:, :2]})
+    if uniq < len(st):
+        print(f"  warning: {len(st) - uniq} station(s) repeat an existing "
+              f"x,y position. Repeats add no new information and will make "
+              f"the survey look better resolved than it is.")
     return st, d
 
 
@@ -77,6 +140,16 @@ def build_mesh(stations, cell, top, bottom, margin=0.25):
     xs = np.arange(x0 - mx + cell / 2, x1 + mx, cell)
     ys = np.arange(y0 - my + cell / 2, y1 + my, cell)
     zs = np.arange(bottom + cell / 2, top, cell)
+    # A zero-length axis used to reach the sparse factoriser and die there
+    # with "zero-size array to reduction operation minimum", which tells a
+    # geologist nothing. Catch it here, in their units.
+    for n, span, hint in ((len(xs), x1 - x0, "--cell smaller than the survey width"),
+                          (len(ys), y1 - y0, "--cell smaller than the survey height"),
+                          (len(zs), top - bottom, "--depth larger than --cell")):
+        if n < 1:
+            raise SystemExit(
+                f"mesh has zero cells along one axis: that extent is "
+                f"{span:,.0f} m and --cell is {cell:,.0f} m. Use {hint}.")
     if len(xs) * len(ys) * len(zs) > MAX_CELLS:
         raise SystemExit(
             f"mesh would be {len(xs) * len(ys) * len(zs):,} cells "

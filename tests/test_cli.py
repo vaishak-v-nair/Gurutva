@@ -1,4 +1,11 @@
-"""The product's front door. If this breaks, no customer can use anything."""
+"""The product's front door. If this breaks, no customer can use anything.
+
+The second half of this file is an adversarial pass made on 2026-08-05:
+twelve malformed or degenerate surveys were pushed through the CLI the way a
+real user would hit them. Four crashed with tracebacks and one misreported
+its cause. Each is now a refusal written in the user's language, pinned here
+so it stays that way.
+"""
 
 import sys
 from pathlib import Path
@@ -11,25 +18,43 @@ sys.path.insert(0, str(ROOT))
 
 from src.product import cli
 
+BASE = ["--noise", "0.02", "--prior-sd", "0.1", "--corr-len", "400",
+        "--cell", "300", "--depth", "900", "--samples", "120"]
+NL = chr(10)
+
+
+def _grid(n_x=8, n_y=5, sep=",", z=1650.0):
+    """Rows of a small 2-D survey, joined with `sep`."""
+    out = []
+    for i in range(n_x):
+        for j in range(n_y):
+            out.append(sep.join([f"{331000 + i * 250}", f"{4263000 + j * 250}",
+                                 f"{z}", "0.01"]))
+    return out
+
+
+def _write(tmp_path, name, header, rows, bom=False):
+    p = tmp_path / name
+    text = header + NL + NL.join(rows) + NL
+    p.write_text(("﻿" if bom else "") + text, encoding="utf-8")
+    return str(p)
+
 
 def _survey(tmp_path, name="s.csv"):
+    """A well-formed survey with real signal, for the happy paths."""
     rng = np.random.default_rng(3)
     gx, gy = np.meshgrid(np.arange(8) * 250.0, np.arange(5) * 250.0,
                          indexing="ij")
     x, y = gx.ravel() + 331000, gy.ravel() + 4263000
-    z = np.full(x.size, 1650.0)
     g = (0.1 * np.exp(-((x - x.mean()) ** 2 + (y - y.mean()) ** 2) / 4e5)
          + rng.normal(0, 0.02, x.size))
     p = tmp_path / name
-    np.savetxt(p, np.column_stack([x, y, z, g]), delimiter=",",
-               header="x,y,z,gz", comments="", fmt="%.3f")
+    np.savetxt(p, np.column_stack([x, y, np.full(x.size, 1650.0), g]),
+               delimiter=",", header="x,y,z,gz", comments="", fmt="%.3f")
     return str(p)
 
 
-BASE = ["--noise", "0.02", "--prior-sd", "0.1", "--corr-len", "400",
-        "--cell", "300", "--depth", "900", "--samples", "120"]
-
-
+# ----------------------------------------------------------- the happy path
 def test_report_mode_produces_a_report(tmp_path):
     out = tmp_path / "r.html"
     cli.main(["report", "--survey", _survey(tmp_path)] + BASE
@@ -62,9 +87,10 @@ def test_report_mode_states_that_recovery_was_untested(tmp_path):
         assert "RECOVERY UNTESTED" in html
 
 
+# ------------------------------------------------------- refusals at the door
 def test_bad_csv_is_refused_with_a_useful_message(tmp_path):
     p = tmp_path / "bad.csv"
-    p.write_text("a,b\n1,2\n", encoding="utf-8")
+    p.write_text("a,b,c,d" + NL + "1,2,3,4" + NL, encoding="utf-8")
     with pytest.raises(SystemExit) as e:
         cli.main(["report", "--survey", str(p), "--noise", "0.02",
                   "--prior-sd", "0.1", "--corr-len", "400"])
@@ -72,10 +98,10 @@ def test_bad_csv_is_refused_with_a_useful_message(tmp_path):
 
 
 def test_too_few_stations_is_refused(tmp_path):
-    p = tmp_path / "tiny.csv"
-    p.write_text("x,y,z,gz\n0,0,0,1\n1,1,0,1\n", encoding="utf-8")
+    p = _write(tmp_path, "tiny.csv", "x,y,z,gz",
+               ["0,0,0,1", "250,250,0,1", "500,0,0,1"])
     with pytest.raises(SystemExit) as e:
-        cli.main(["report", "--survey", str(p), "--noise", "0.02",
+        cli.main(["report", "--survey", p, "--noise", "0.02",
                   "--prior-sd", "0.1", "--corr-len", "400"])
     assert "Too few" in str(e.value)
 
@@ -94,3 +120,87 @@ def test_noise_is_mandatory():
     with pytest.raises(SystemExit):
         cli.main(["report", "--survey", "x.csv", "--prior-sd", "0.1",
                   "--corr-len", "400"])
+
+
+# ------------------------------- the adversarial pass (all of these crashed)
+def test_collinear_survey_is_refused_not_crashed(tmp_path):
+    """A single line of stations cannot constrain a 3-D field. This died
+    inside the sparse factoriser with 'zero-size array to reduction operation
+    minimum', which tells a geologist nothing."""
+    rows = [f"{331000 + i * 250},4263000,1650,0.01" for i in range(40)]
+    p = _write(tmp_path, "line.csv", "x,y,z,gz", rows)
+    with pytest.raises(SystemExit) as e:
+        cli.main(["report", "--survey", p] + BASE)
+    assert "single line" in str(e.value)
+
+
+def test_nan_is_refused_at_the_door_with_a_line_number(tmp_path):
+    """A blank reading sailed through and was caught three gates later by
+    luck. Refuse it, and say which line."""
+    rows = _grid()
+    rows[4] = "331000,4264000,1650,"
+    p = _write(tmp_path, "nan.csv", "x,y,z,gz", rows)
+    with pytest.raises(SystemExit) as e:
+        cli.main(["report", "--survey", p] + BASE)
+    msg = str(e.value)
+    assert "line 6" in msg and "non-numeric" in msg
+
+
+def test_semicolon_csv_is_read(tmp_path):
+    """The European export default. Died inside genfromtxt."""
+    p = _write(tmp_path, "semi.csv", "x;y;z;gz", _grid(sep=";"))
+    out = tmp_path / "s.html"
+    cli.main(["report", "--survey", p] + BASE + ["--out", str(out)])
+    assert out.exists()
+
+
+def test_mismatched_delimiters_name_the_real_problem(tmp_path):
+    """Header comma-separated, data semicolon-separated: reported 'only 0
+    stations', which blames the wrong thing."""
+    p = _write(tmp_path, "mixed.csv", "x,y,z,gz", _grid(sep=";"))
+    with pytest.raises(SystemExit) as e:
+        cli.main(["report", "--survey", p] + BASE)
+    assert "separat" in str(e.value)
+
+
+def test_utf8_bom_does_not_hide_the_x_column(tmp_path):
+    """A BOM turned the first column into a name starting with U+FEFF, so the
+    error blamed a missing x. Excel writes BOMs by default."""
+    p = _write(tmp_path, "bom.csv", "x,y,z,gz", _grid(), bom=True)
+    out = tmp_path / "b.html"
+    cli.main(["report", "--survey", p] + BASE + ["--out", str(out)])
+    assert out.exists()
+
+
+def test_uppercase_and_padded_headers_are_accepted(tmp_path):
+    """Real exports write ' X , Y , Z , GZ '. Refusing those is pedantry."""
+    p = _write(tmp_path, "case.csv", " X , Y , Z , GZ ", _grid())
+    out = tmp_path / "u.html"
+    cli.main(["report", "--survey", p] + BASE + ["--out", str(out)])
+    assert out.exists()
+
+
+def test_wrong_units_are_caught_by_the_gates(tmp_path):
+    """microGal submitted where mGal is required: 1000x too big. The gates
+    must refuse rather than return a confident wrong answer."""
+    rng = np.random.default_rng(5)
+    gx, gy = np.meshgrid(np.arange(8) * 250.0, np.arange(5) * 250.0,
+                         indexing="ij")
+    x, y = gx.ravel() + 331000, gy.ravel() + 4263000
+    g = 1000 * (0.1 * np.exp(-((x - x.mean()) ** 2 + (y - y.mean()) ** 2) / 4e5)
+                + rng.normal(0, 0.02, x.size))
+    p = tmp_path / "ug.csv"
+    np.savetxt(p, np.column_stack([x, y, np.full(x.size, 1650.0), g]),
+               delimiter=",", header="x,y,z,gz", comments="", fmt="%.3f")
+    out = tmp_path / "w.html"
+    code = cli.main(["report", "--survey", str(p)] + BASE + ["--out", str(out)])
+    assert code == 1, "a 1000x unit error must not come back claimable"
+    assert "NOT CLAIMED" in out.read_text(encoding="utf-8")
+
+
+def test_duplicate_stations_are_warned_about(tmp_path, capsys):
+    """Repeats add no information but make the survey look better resolved."""
+    rows = _grid()
+    p = _write(tmp_path, "dup.csv", "x,y,z,gz", rows + rows[:6])
+    cli.main(["report", "--survey", p] + BASE + ["--out", str(tmp_path / "d.html")])
+    assert "repeat an existing" in capsys.readouterr().out
