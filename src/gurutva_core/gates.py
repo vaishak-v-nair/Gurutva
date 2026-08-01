@@ -167,7 +167,7 @@ def adequacy(pp_residual, reference_residual, factor=3.0) -> GateReport:
 
 
 def recovery(est, sd, truth, k=1.96, min_cover=0.90,
-             max_miss_sigma=3.0) -> GateReport:
+             max_miss_sigma=None) -> GateReport:
     """DOES THE INTERVAL CONTAIN A KNOWN RIGHT ANSWER?
 
     Born 2026-08-05 from the dark-matter run, which passed all four core
@@ -203,9 +203,19 @@ def recovery(est, sd, truth, k=1.96, min_cover=0.90,
     miss = np.abs(est - truth) / np.where(sd > 0, sd, np.inf)
     cover = float(np.mean(miss < k))
     worst = float(np.max(miss))
+    n = len(miss)
+    # The worst-miss threshold MUST scale with how many cells you looked at.
+    # A perfectly calibrated posterior over n cells has an expected maximum
+    # |z| of about sqrt(2 ln n) — 4.2 at n=8000 — so a fixed 3-sigma cap is a
+    # max-over-cells gate that correct code fails by construction. This
+    # repo's own README warns against exactly that, and the first version of
+    # this gate did it anyway: a survey self-test covering 99.4% of cells was
+    # failed by a lone 4.0-sigma cell that calibration predicts you will see.
+    if max_miss_sigma is None:
+        max_miss_sigma = max(3.0, 1.15 * float(np.sqrt(2.0 * np.log(max(n, 2)))))
     ok = cover >= min_cover and worst <= max_miss_sigma
     return GateReport("recovery", ok, cover,
                       f"cover >= {min_cover:.2f} and worst miss <= "
-                      f"{max_miss_sigma:g} sigma",
+                      f"{max_miss_sigma:.2f} sigma (n={n:,})",
                       f"worst {worst:.1f} sigma — the gate the other four "
                       f"cannot be")

@@ -190,3 +190,34 @@ def build_regular(shape, spacing, prior_sd, corr_len_m, rng, n_calib=400):
     return SmoothPrior(Q0, scale), dict(raw_median_sd=sd0, scale=scale,
                                         corr_len_m=corr_len_m,
                                         declared_sd=prior_sd, n_calib=n_calib)
+
+
+def expected_residual(G, prior):
+    """RMS the posterior mean SHOULD leave behind, in whitened units.
+
+    Added 2026-08-05 after the CLI's first real run exposed a bug in the
+    adequacy gate. That gate was made two-sided so it would catch a model
+    that had "absorbed the noise floor" — but it compared the residual to the
+    NOISE, and that reference is wrong whenever the model has more freedom
+    than the data has points.
+
+    With whitened data (Sigma_d = I) and K = G S G^T + I:
+
+        prediction = G mu = (I - K^-1) d
+        residual   = d - G mu = K^-1 d
+        E||r||^2   = tr(K^-1 E[d d^T] K^-1) = tr(K^-1)   under d ~ N(0, K)
+
+    so the expected RMS is sqrt(tr(K^-1)/n), which falls below 1 exactly to
+    the degree the model is flexible. Comparing against 1 instead flags a
+    correctly-behaving posterior as overfitting, and the only way to satisfy
+    it is to shrink the prior back to the tuned-regularizer value this whole
+    project exists to reject. Measured on a 120-station demo: a prior of
+    0.25, 0.10 and 0.05 g/cc all "failed", and only 0.02 g/cc passed.
+
+    Against this reference the gate asks the right question instead: is the
+    misfit consistent with what THIS model, with THIS much freedom, predicts
+    of itself?
+    """
+    SGt = prior.apply_inv(G.T)
+    K = G @ SGt + np.eye(G.shape[0])
+    return float(np.sqrt(np.trace(np.linalg.inv(K)) / G.shape[0]))
