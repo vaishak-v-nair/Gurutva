@@ -243,13 +243,22 @@ class App:
         self.root.after(120, self._drain)
 
 
-def main():
+def main(on_ready=None):
+    """on_ready fires once the window is actually on screen, not merely built.
+
+    The frozen build hands in the splash-closer here. Closing it after
+    `update()` rather than before `mainloop()` means the splash never
+    disappears into an empty desktop while tk is still laying out.
+    """
     root = tk.Tk()
     try:
         ttk.Style().theme_use("vista")
     except tk.TclError:
         pass
     App(root)
+    root.update()
+    if on_ready is not None:
+        on_ready()
     root.mainloop()
 
 

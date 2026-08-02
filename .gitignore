@@ -5,3 +5,20 @@ __pycache__/
 data/
 
 data/sleipner/*.zip
+
+# training exhaust: hostnames and PIDs in every filename, reproduces nothing
+sbi-logs/
+
+# internal velocity note, kept out of the public repo by choice
+BURN.md
+
+# PyInstaller output. dist/ alone is ~230 MB across both build shapes, and the
+# .exe belongs on a GitHub release, not in git history where it can never be
+# removed. web/gurutva.zip (65 KB) IS tracked on purpose: the page embeds it.
+build/
+dist/
+web/Gurutva-windows.zip
+
+# written by `Gurutva.exe --where` wherever it is run from
+gurutva-where.log
+gurutva.log

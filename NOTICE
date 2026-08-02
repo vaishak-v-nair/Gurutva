@@ -1,0 +1,22 @@
+Gurutva
+Copyright 2026 Vaishak V Nair
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes the posterior-uncertainty engine, its validation gates,
+and the desktop application, all of which are original work.
+
+Third-party data used for validation is NOT redistributed here and carries its
+own terms:
+
+  Utah FORGE 3D gravity — DOE Geothermal Data Repository submission 1144,
+  doi:10.15121/1542061, CC-BY 4.0. Figures in figures/ are derived from this
+  dataset; attribution is recorded in README.md. The data itself is fetched,
+  not committed.
+
+  Sleipner 2019 Benchmark Model — CO2DataShare. Not included and never
+  downloaded; see data/sleipner/README.md.
+
+The published SimPEG inversion this repository reproduces (Witter / Innovate
+Geothermal, May 2019) is part of the same CC-BY 4.0 archive and is referenced,
+not vendored.

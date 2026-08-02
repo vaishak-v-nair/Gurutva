@@ -23,8 +23,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = json.loads((ROOT / "web" / "demo_data.json").read_text())
-# Encoded from the zip itself, so there is one source of truth for what a
-# visitor downloads rather than a second file that can silently go stale.
+
+REPO = "https://github.com/vaishak-v-nair/Gurutva"
+# `releases/latest/download/<asset>` always resolves to the newest release
+# carrying that asset name, so the page never has to be rebuilt to point at a
+# new version. The asset name is therefore load-bearing: make_release.py
+# checks it.
+EXE_URL = f"{REPO}/releases/latest/download/Gurutva.exe"
+_EXE = ROOT / "dist" / "onefile" / "Gurutva.exe"
+EXE_MB = round(_EXE.stat().st_size / 1e6) if _EXE.exists() else 71
+
+# The source zip is still built and still embedded: it is 61 KB, it needs
+# Python, and it is what someone reads if they want to see what they are
+# running before they run it. It is no longer the headline.
 _ZIP = ROOT / "web" / "gurutva.zip"
 ZIP_B64 = base64.b64encode(_ZIP.read_bytes()).decode()
 ZIP_KB = round(_ZIP.stat().st_size / 1024)
@@ -177,10 +188,11 @@ footer{border-top:1px solid var(--line);padding:22px 0 60px;
 """
 
 JS = r"""
-/* One copy of the bundle, three buttons. Embedding the base64 three times
-   put 165 KB of duplicate string in a page whose whole job is a fast first
-   impression. */
-document.querySelectorAll("[data-dl]").forEach(a =>
+/* The .exe is 70 MB and cannot be a data URI, so the headline download is a
+   real link to the GitHub release and needs no JS at all. Only the source
+   zip is still embedded, for the reader who wants to see the code before
+   running anything. */
+document.querySelectorAll("[data-src-zip]").forEach(a =>
   a.href = "data:application/zip;base64," + __ZIP__);
 const D = __DATA__;
 const NX = D.nx, NZ = D.nz;
@@ -296,7 +308,7 @@ def build():
 <main>
 <header><div class="wrap hdr">
   <div class="brand">Gurutva <span>how much of that picture is real?</span></div>
-  <a class="hdr-get" data-dl href="#get" download="gurutva.zip">Download &nbsp;&darr;</a>
+  <a class="hdr-get" href="{EXE_URL}">Download &nbsp;&darr;</a>
 </div></header>
 
 <section id="hook"><div class="wrap">
@@ -333,14 +345,16 @@ def build():
   whole problem, and almost nothing in this industry admits it.</p>
 
   <div class="getline">
-    <a class="get" data-dl href="#get"
-       download="gurutva.zip">Download and run it &nbsp;&darr;</a>
-    <span class="getnote">{ZIP_KB}&nbsp;KB. Runs on your laptop.
-      Your survey is never uploaded anywhere.</span>
+    <a class="get" href="{EXE_URL}">Download for Windows &nbsp;&darr;</a>
+    <span class="getnote">{EXE_MB}&nbsp;MB. Double-click it. Runs on your
+      laptop; your survey is never uploaded anywhere.</span>
   </div>
-  <div class="need">Needs Python 3.10+ with
-    <code>numpy scipy matplotlib</code>. If that is a blocker, email me and
-    I will run your survey myself.</div>
+  <div class="need">No Python, no install, no admin rights. Windows will warn
+    you that it is from an unrecognised publisher &mdash; that is a statement
+    about a code-signing certificate nobody has bought yet, not about the
+    file. Prefer to read the source first? <a data-src-zip href="#get"
+    download="gurutva.zip">The {ZIP_KB}&nbsp;KB Python version</a> is the same
+    code, and needs <code>numpy scipy matplotlib</code>.</div>
 </div></section>
 
 <section id="play"><div class="wrap">
@@ -418,24 +432,23 @@ def build():
   Get a defensible statement of what your monitoring can and cannot show
   &mdash; before you fund it.</p>
   <p class="who"><b>You want to check the work.</b> {N_TESTS} passing tests,
-  and the retractions are in there too. Ask and you get access.</p>
+  and the retractions are in there too. The code is
+  <a href="{REPO}">public, under Apache&#8209;2.0</a>.</p>
 
   <div class="how">
     <h3>How you actually use it</h3>
     <ol>
-      <li>Download the zip and unpack it anywhere.</li>
-      <li>Make sure you have Python 3.10 or newer, then once:
-        <code>pip install numpy scipy matplotlib</code></li>
-      <li>Double-click <code>Gurutva.bat</code> on Windows, or run
-        <code>./gurutva</code> on Mac and Linux. A window opens.</li>
+      <li>Download <code>Gurutva.exe</code> and double-click it. There is no
+        step two: no Python, no install, no admin rights.</li>
       <li>Press <b>Use the example</b>, then <b>Run</b>, to watch it work on
-        a survey that ships with it.</li>
+        a survey that ships inside it.</li>
       <li>Then choose your own CSV and answer three questions about your
         site. We do not guess them for you: they are statements about your
         ground, not ours.</li>
+      <li>A report opens in your browser, saved next to your data.</li>
     </ol>
-    <p class="getline"><a class="get" data-dl href="#get"
-       download="gurutva.zip">Download gurutva.zip &nbsp;&darr;</a></p>
+    <p class="getline"><a class="get" href="{EXE_URL}">Download
+       Gurutva.exe &nbsp;&darr;</a></p>
     <p class="whynot">There is no sign-up, no upload, and no server. It runs
     on your laptop and your data never leaves it. If a check fails it will
     tell you so and refuse to give you a number &mdash; that is the product,
@@ -443,15 +456,15 @@ def build():
   </div>
 
   <p class="contact">
-    <a href="mailto:vaishak.v.nair.dev@gmail.com">vaishak.v.nair.dev@gmail.com</a>
+    <a href="{REPO}/issues">Tell me what broke &mdash; github.com/vaishak-v-nair/Gurutva/issues</a>
   </p>
 </div></section>
 
 <footer><div class="wrap">
   Gurutva &middot; Bayesian uncertainty for gravity and magnetic surveys.
   The four possibilities above are posterior samples from the real engine, not
-  illustrations. Repository private pending publication. No tracking, no
-  cookies.
+  illustrations. Source at <a href="{REPO}">github.com/vaishak-v-nair/Gurutva</a>,
+  Apache&#8209;2.0. No tracking, no cookies.
 </div></footer>
 </main>
 <script>{js}</script>
@@ -459,6 +472,17 @@ def build():
     out = ROOT / "web" / "index.html"
     out.write_text(html, encoding="utf-8")
     print(f"wrote {out}  ({len(html)/1024:.0f} KB, {N_TESTS} tests)")
+
+    # GitHub Pages serves main:/docs. Writing the same bytes to both keeps
+    # web/ as the source of truth and makes the published page a build
+    # artifact rather than a file anyone edits by hand.
+    pages = ROOT / "docs" / "index.html"
+    pages.write_text(html, encoding="utf-8")
+    # Pages runs Jekyll by default, which silently drops files and folders
+    # beginning with an underscore. Nothing here starts with one today, and
+    # this is the one-line insurance against that changing.
+    (ROOT / "docs" / ".nojekyll").write_text("", encoding="utf-8")
+    print(f"wrote {pages}  (GitHub Pages: main branch, /docs)")
 
 
 if __name__ == "__main__":

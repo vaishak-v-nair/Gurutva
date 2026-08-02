@@ -1,14 +1,26 @@
-# gravity-posterior
+# Gurutva — gravity, with error bars
 
-*What does a published gravity inversion actually know? Reproducing a published potential-field inversion and computing the posterior uncertainty almost nobody reports.*
+**Inversion software draws you one picture of what is underground. Gurutva tells you which parts of that picture your data actually support, and refuses to answer when it cannot.**
 
-> **Status: Day 1.** This README states the plan and the pass/fail gates before any results exist. Every claim below is a commitment, not a result, until its checkbox is ticked and its figure is in this repo.
+[**Download for Windows**](https://github.com/vaishak-v-nair/Gurutva/releases/latest) · [the page](https://vaishak-v-nair.github.io/Gurutva/) · Apache-2.0 · 172 passing tests
+
+Double-click the `.exe`. No Python, no install, no admin rights, nothing uploaded — it runs entirely on your laptop. Point it at a four-column CSV, answer three questions about your site, and it writes an HTML report next to your data saying one of three things:
+
+| verdict | meaning |
+|---|---|
+| **NOT CLAIMED** | a check failed. The numbers are diagnostics, not decisions. |
+| **PROVISIONAL** | every check passed, but nothing was compared against a known right answer — because real data has none. |
+| **CLAIMABLE** | every check passed *and* it was verified against a known answer. |
+
+If it refuses, that is the product working. Anyone can add error bars; almost nobody will ship a tool that tells a paying customer "not today."
 
 ## Purpose
 
 Inversion software (SimPEG open-source, commercial packages) returns a single regularized model — one picture of the subsurface. The decisions those pictures support deserve a *posterior*: which parts of the model the data actually constrain, and which parts come from the regularization. For a linear forward operator with Gaussian noise and a Gaussian prior, that posterior exists in closed form. This repo computes it for a published inversion, validates it hard, and shows the result honestly.
 
 I'm new to geophysics, coming from software/ML. This repo is deliberately built so that every number in it can be checked without trusting me.
+
+> **The rest of this README is the original day-1 document, kept deliberately.** It states the pass/fail gates in the future tense because they were written *before* any result existed, and the checkboxes were ticked afterwards. The failures and retractions are still in it. That ordering is the only reason the numbers below are worth anything.
 
 ## What this repo will contain (the deliverables)
 
