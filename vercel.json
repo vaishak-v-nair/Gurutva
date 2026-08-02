@@ -4,7 +4,6 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": "docs",
-  "//cleanUrls": "false on purpose: GitHub Pages serves the same bytes as a mirror and does not rewrite extensions, so cleanUrls made /reports/x.html 308 on one host and 200 on the other for identical links.",
   "cleanUrls": false,
   "trailingSlash": false,
   "headers": [
