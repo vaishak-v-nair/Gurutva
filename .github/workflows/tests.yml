@@ -48,7 +48,7 @@ jobs:
           pytest -q --tb=short \
             tests/test_product.py tests/test_cli.py tests/test_survey.py \
             tests/test_exe.py tests/test_prior.py tests/test_joint.py \
-            tests/test_posterior.py tests/test_gurutva_core.py
+            tests/test_app.py tests/test_gurutva_core.py tests/test_mag.py
 
   windows:
     name: the window imports on Windows

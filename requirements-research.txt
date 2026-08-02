@@ -12,6 +12,10 @@
 
 simpeg==0.25.2
 discretize==0.12.0
+# h5py reads the delivered geoh5 workspace. It was declared in NO requirements
+# file until CI caught it: src/forge_data.py imports it at module level, and it
+# happened to be installed on the only machine the tests had ever run on.
+h5py==3.16.0
 numpy==2.5.1
 scipy==1.18.0
 pandas==3.0.3
