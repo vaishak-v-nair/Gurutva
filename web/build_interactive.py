@@ -469,6 +469,40 @@ def build():
 </main>
 <script>{js}</script>
 """
+    # For a year this page was a fragment: the artifact host wrapped it in a
+    # document and supplied the head. Served from GitHub Pages the fragment IS
+    # the document, and the live page had no doctype (quirks mode), no title,
+    # and — the one that actually mattered — no viewport meta, so every phone
+    # laid it out at 980px and scaled the result down. Found by loading the
+    # published URL, not by reading this file.
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gurutva — how much of that picture is real?</title>
+<meta name="description" content="Gravity surveys decide where to drill and
+whether stored CO2 stayed put. Gurutva computes which parts of that picture
+your data actually support, and refuses to answer when it cannot.">
+<meta name="theme-color" content="#faf8f4"
+      media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1114"
+      media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Gurutva — gravity, with error bars">
+<meta property="og:description" content="Inversion software draws you one
+picture of what is underground. Gurutva tells you which parts your data
+actually support, and refuses to answer when it cannot.">
+<meta property="og:url" content="https://vaishak-v-nair.github.io/Gurutva/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://vaishak-v-nair.github.io/Gurutva/">
+</head>
+<body>
+{html}
+</body>
+</html>
+"""
+
     out = ROOT / "web" / "index.html"
     out.write_text(html, encoding="utf-8")
     print(f"wrote {out}  ({len(html)/1024:.0f} KB, {N_TESTS} tests)")
