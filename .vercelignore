@@ -1,0 +1,15 @@
+# Vercel serves docs/ only. Everything else is source, data or build output
+# and does not need to be uploaded on every deploy.
+src/
+tests/
+notebooks/
+examples/
+figures/
+data/
+sbi-logs/
+build/
+dist/
+web/gurutva.zip
+web/Gurutva-windows.zip
+__pycache__/
+*.pyc

@@ -102,6 +102,53 @@ def splash(work):
     return out
 
 
+VERSION = (0, 1, 0, 0)
+
+VERSION_RESOURCE = """
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={v}, prodvers={v},
+    mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', 'Vaishak V Nair'),
+      StringStruct('FileDescription',
+                   'Gurutva - posterior uncertainty for gravity and '
+                   'magnetic surveys'),
+      StringStruct('FileVersion', '{s}'),
+      StringStruct('InternalName', 'Gurutva'),
+      StringStruct('LegalCopyright',
+                   'Copyright 2026 Vaishak V Nair. Apache-2.0.'),
+      StringStruct('OriginalFilename', 'Gurutva.exe'),
+      StringStruct('ProductName', 'Gurutva'),
+      StringStruct('ProductVersion', '{s}')])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"""
+
+
+def version_file(work):
+    """Give the binary a name Windows can show.
+
+    An unsigned executable with no version resource makes SmartScreen's
+    "More info" panel read `App: Gurutva.exe / Publisher: Unknown publisher`,
+    which is the worst possible framing for a stranger who has just been told
+    this is a real product. It does not remove the warning — only a
+    code-signing certificate does that — but it fills in the name, the
+    description and the copyright, so the panel describes something rather
+    than nothing.
+    """
+    work.mkdir(parents=True, exist_ok=True)
+    out = work / "version.txt"
+    s = ".".join(str(n) for n in VERSION)
+    out.write_text(VERSION_RESOURCE.replace("{v}", str(VERSION))
+                   .replace("{s}", s), encoding="utf-8")
+    return out
+
+
 def build(onedir=False):
     """One file, or one folder.
 
@@ -118,6 +165,7 @@ def build(onedir=False):
            "--windowed", "--name", NAME,
            "--distpath", str(dist), "--workpath", str(work),
            "--specpath", str(work),
+           "--version-file", str(version_file(work)),
            "--paths", str(ROOT)]
     if not onedir:                     # a folder build has nothing to unpack
         cmd += ["--splash", str(splash(work))]

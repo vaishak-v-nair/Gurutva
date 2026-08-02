@@ -17,7 +17,13 @@ your data actually support, and refuses to answer when it cannot.">
 picture of what is underground. Gurutva tells you which parts your data
 actually support, and refuses to answer when it cannot.">
 <meta property="og:url" content="https://vaishak-v-nair.github.io/Gurutva/">
+<meta property="og:image"
+      content="https://vaishak-v-nair.github.io/Gurutva/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image"
+      content="https://vaishak-v-nair.github.io/Gurutva/social-preview.png">
 <link rel="canonical" href="https://vaishak-v-nair.github.io/Gurutva/">
 </head>
 <body>
@@ -70,7 +76,25 @@ header{padding:40px 0 0}
 #hook h1{font-size:38px;line-height:1.22;letter-spacing:-.02em;margin:0 0 14px;
   max-width:20ch;text-wrap:balance}
 #hook .sub{color:var(--mut);font-size:20px;max-width:52ch;margin:0 0 28px}
-.worlds{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.worlds{display:grid;grid-template-columns:1.06fr repeat(4,1fr);gap:12px;
+  align-items:end}
+.worlds .truth canvas{border-color:var(--ink);border-width:2px}
+.worlds .truth figcaption{color:var(--ink);font-weight:600}
+.worlds .sep{border-left:1px solid var(--line);padding-left:12px}
+.ss{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center;
+  margin:14px 0 12px}
+.ss-shot{background:#c42b1c;color:#fff;border-radius:6px;padding:14px 14px 16px;
+  font-family:var(--ui);line-height:1.35}
+.ss-t{font-size:15px;font-weight:600;margin-bottom:7px}
+.ss-b{font-size:11px;opacity:.93}
+.ss-more{font-size:11px;margin-top:9px;text-decoration:underline;
+  font-weight:600}
+.ss-steps{margin:0;padding-left:20px;font-size:15px}
+.ss-steps li{margin:0 0 7px}
+.verify{font-size:13px;font-family:var(--ui)}
+.verify code{font-size:11px;word-break:break-all}
+.verify span{color:var(--mut)}
+@media (max-width:640px){.ss{grid-template-columns:1fr}}
 .worlds figure{margin:0}
 .worlds canvas{width:100%;height:auto;display:block;border:1px solid var(--line);
   border-radius:6px;background:var(--paper)}
@@ -155,6 +179,7 @@ footer{border-top:1px solid var(--line);padding:22px 0 60px;
 @media (max-width:900px){
   .play-grid{grid-template-columns:1fr;gap:24px}
   .worlds{grid-template-columns:repeat(2,1fr)}
+  .worlds .sep{border-left:0;padding-left:0}
   .states,.proof{grid-template-columns:1fr;gap:18px}
   #hook h1{font-size:29px}
   .punch{font-size:20px}
@@ -169,14 +194,19 @@ footer{border-top:1px solid var(--line);padding:22px 0 60px;
 </div></header>
 
 <section id="hook"><div class="wrap">
-  <h1>These four pictures all fit the same readings.</h1>
-  <p class="sub">Four different arrangements of buried rock, differing by more
-  than the whole body anyone is looking for. Yet they predict readings that
-  sit within a whisker of each other. Ordinary software picks one of them and
-  draws it for you, in colour, with no warning.</p>
+  <h1>We buried one block. Your survey cannot find it.</h1>
+  <p class="sub">On the left is what is actually down there. We planted it, so
+  the answer can be graded rather than argued about. The four beside it are
+  what your readings still allow &mdash; every one of them reproduces the same
+  measurements, to within twice the wobble of the instrument. Ordinary
+  software picks one of them and draws it for you, in colour, with no
+  warning.</p>
 
   <div class="worlds">
-    <figure><canvas id="w0" aria-label="Underground picture 1"></canvas>
+    <figure class="truth"><canvas id="wT"
+      aria-label="The block that was actually buried"></canvas>
+      <figcaption>What is really there</figcaption></figure>
+    <figure class="sep"><canvas id="w0" aria-label="Underground picture 1"></canvas>
       <figcaption>Possibility 1</figcaption></figure>
     <figure><canvas id="w1" aria-label="Underground picture 2"></canvas>
       <figcaption>Possibility 2</figcaption></figure>
@@ -198,20 +228,43 @@ footer{border-top:1px solid var(--line);padding:22px 0 60px;
     meter.</div>
   </div>
 
-  <p class="punch">So which one is true? <b>Nobody knows.</b> That is the
-  whole problem, and almost nothing in this industry admits it.</p>
+  <p class="punch">None of the four looks like the block. <b>That is not a
+  bug in the software &mdash; it is what your data left undecided.</b> Which
+  is itself measurable, and almost nothing in this industry reports it.</p>
 
   <div class="getline">
     <a class="get" href="https://github.com/vaishak-v-nair/Gurutva/releases/latest/download/Gurutva.exe">Download for Windows &nbsp;&darr;</a>
     <span class="getnote">71&nbsp;MB. Double-click it. Runs on your
       laptop; your survey is never uploaded anywhere.</span>
   </div>
-  <div class="need">No Python, no install, no admin rights. Windows will warn
-    you that it is from an unrecognised publisher &mdash; that is a statement
-    about a code-signing certificate nobody has bought yet, not about the
-    file. Prefer to read the source first? <a data-src-zip href="#get"
-    download="gurutva.zip">The 65&nbsp;KB Python version</a> is the same
-    code, and needs <code>numpy scipy matplotlib</code>.</div>
+  <div class="need"><b>Windows will show you a red screen. It is expected,
+    and here is exactly what to do.</b>
+    <div class="ss">
+      <div class="ss-shot" aria-hidden="true">
+        <div class="ss-t">Windows protected your PC</div>
+        <div class="ss-b">Microsoft Defender SmartScreen prevented an
+          unrecognised app from starting.</div>
+        <div class="ss-more">More info</div>
+      </div>
+      <ol class="ss-steps">
+        <li>Click <b>More info</b> &mdash; the small link. It is the only way
+          to reveal the next button.</li>
+        <li>Click <b>Run anyway</b>.</li>
+      </ol>
+    </div>
+    <p>That screen means <b>nobody has bought a code-signing certificate for
+    this file yet</b>. It is not a virus scan and it is not a detection: every
+    unsigned program from an individual developer gets it, on day one, until
+    enough people have downloaded it. Do not take my word for it &mdash;
+    check the file yourself:</p>
+    <p class="verify">SHA-256 <code>143b0a4b30a1ea7fdb9bbf24cdde53858cdef12c408cf1c347f44936c424a7f6</code><br>
+    <span>Windows: <code>certutil -hashfile Gurutva.exe SHA256</code> &nbsp;·&nbsp;
+    or upload it to <a href="https://www.virustotal.com/gui/home/upload"
+    rel="noopener">VirusTotal</a> and see for yourself.</span></p>
+    <p>Rather not run a stranger's executable at all? Reasonable.
+    <a data-src-zip href="#get" download="gurutva.zip">The
+    65&nbsp;KB Python version</a> is the same code, small enough to read
+    before you run it, and needs <code>numpy scipy matplotlib</code>.</p></div>
 </div></section>
 
 <section id="play"><div class="wrap">
@@ -401,6 +454,7 @@ function drawReadings(cv, series, colours){
 
 /* ---- act one ---- */
 const L0 = D.levels[D.levels.length-1];
+drawSection(document.getElementById("wT"), D.truth);
 ["w0","w1","w2","w3"].forEach((id,i)=>
   drawSection(document.getElementById(id), L0.worlds[i]));
 const ink = getComputedStyle(document.body).getPropertyValue("--ink");
