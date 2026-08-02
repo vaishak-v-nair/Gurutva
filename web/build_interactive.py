@@ -122,6 +122,10 @@ header{padding:40px 0 0}
 .verify code{font-size:11px;word-break:break-all}
 .verify span{color:var(--mut)}
 @media (max-width:640px){.ss{grid-template-columns:1fr}}
+.rep{display:block;margin-top:10px;font-family:var(--ui);font-size:12.5px;
+  font-weight:600;text-decoration-thickness:1.5px}
+.repnote{font-family:var(--ui);font-size:13px;color:var(--mut);
+  margin:22px 0 0;max-width:70ch}
 .worlds figure{margin:0}
 .worlds canvas{width:100%;height:auto;display:block;border:1px solid var(--line);
   border-radius:6px;background:var(--paper)}
@@ -467,18 +471,27 @@ def build():
       <div class="k">Utah FORGE &middot; real DOE data</div>
       <div class="d">95% between {lo:+,.0f} and {hi:+,.0f}. The standard
       workflow would have called this interval
-      {geo['overconfidence_factor']:.1f}&times; tighter than it is.</div></div>
+      {geo['overconfidence_factor']:.1f}&times; tighter than it is.
+      <a class="rep" href="reports/verdict_geothermal.html">Read the whole
+      report &rarr;</a></div></div>
     <div><div class="n num">72%</div>
       <div class="k">CO&#8322; containment</div>
       <div class="d">A 400 m leak two kilometres out is only detectable above
       72% saturation. Below that, no containment claim covers it &mdash; and
-      we say so instead of quoting a number.</div></div>
+      we say so instead of quoting a number.
+      <a class="rep" href="reports/verdict_carbon_storage.html">Read the whole
+      report &rarr;</a></div></div>
     <div><div class="n num">{dm['peak_sigma']:.1f}&sigma;</div>
       <div class="k">A dark-matter halo</div>
       <div class="d">The same code, unchanged, at 10<sup>22</sup> times the
       distance. All four checks passed and the fifth caught it anyway, so the
-      map is <em>not claimed</em>.</div></div>
+      map is <em>not claimed</em>.
+      <a class="rep" href="reports/verdict_dark_matter.html">Read the whole
+      report &rarr;</a></div></div>
   </div>
+  <p class="repnote">Those are the actual documents the tool writes, not
+  summaries of them. The gate rows, the refusals and the figures are exactly
+  what lands next to your data.</p>
 </div></section>
 
 <section id="start"><div class="wrap">

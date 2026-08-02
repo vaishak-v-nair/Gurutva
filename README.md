@@ -6,7 +6,7 @@
 
 [![release](https://img.shields.io/github/v/release/vaishak-v-nair/Gurutva?color=%230a7b52&label=download)](https://github.com/vaishak-v-nair/Gurutva/releases/latest)
 [![licence](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-172%20passing-%230a7b52)](tests/)
+[![tests](https://github.com/vaishak-v-nair/Gurutva/actions/workflows/tests.yml/badge.svg)](https://github.com/vaishak-v-nair/Gurutva/actions/workflows/tests.yml)
 [![page](https://img.shields.io/badge/site-gurutva-black)](https://gurutva.vercel.app/)
 
 ## Start here
@@ -16,7 +16,8 @@
 | **just use it** | [Download `Gurutva.exe`](https://github.com/vaishak-v-nair/Gurutva/releases/latest) and double-click. No Python, no install, no admin rights. |
 | **see it before I install anything** | [The page](https://gurutva.vercel.app/) runs the argument in your browser. |
 | **read the code first** | Start at [`src/product/verdict.py`](src/product/verdict.py) (the gates) and [`src/product/prior.py`](src/product/prior.py) (the prior the gates demanded). |
-| **check the claims** | `pip install -r requirements.txt && pytest` — 172 tests, including one for every bug ever introduced. |
+| **check the claims** | `pip install -r requirements.txt && pytest` — 172 tests, including one for every bug ever introduced. Runs on Python 3.11–3.14; [CI proves it](https://github.com/vaishak-v-nair/Gurutva/actions). |
+| **see a real report** | [geothermal](https://gurutva.vercel.app/reports/verdict_geothermal.html) · [CO₂ containment](https://gurutva.vercel.app/reports/verdict_carbon_storage.html) · [dark matter](https://gurutva.vercel.app/reports/verdict_dark_matter.html) — the actual documents the tool writes. |
 | **tell me it's wrong** | [Open an issue](https://github.com/vaishak-v-nair/Gurutva/issues). This is the most useful thing you can do. |
 
 > **Windows will show a red "Windows protected your PC" screen.** Click **More info**, then **Run anyway**. That screen means nobody has bought a code-signing certificate for this file yet — it is not a detection. Verify the download against the SHA-256 in the [release notes](https://github.com/vaishak-v-nair/Gurutva/releases/latest) (`certutil -hashfile Gurutva.exe SHA256`), or run the [65 KB Python version](web/gurutva.zip) instead, which is small enough to read before you run it.
@@ -90,7 +91,7 @@ I'm new to geophysics, coming from software/ML. This repo is deliberately built 
 
 ## Reproducibility
 
-- Pinned environment (`requirements.txt`, SimPEG version fixed).
+- Pinned environment (`requirements-research.txt`, SimPEG version fixed). `requirements.txt` is the product layer and uses floors, so the verification command above resolves on 3.11–3.14; the research pins are exact and 3.14-only.
 - Every stochastic step uses a seeded `numpy.random.Generator`; the seed is stated here.
 - `make figures` regenerates every figure in this README bit-for-bit.
 

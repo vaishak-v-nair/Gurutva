@@ -8,6 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+pytest.importorskip("simpeg", reason="pip install -r requirements-research.txt")
+
 from src import smoothness
 
 

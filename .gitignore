@@ -23,4 +23,9 @@ web/Gurutva-windows.zip
 gurutva-where.log
 gurutva.log
 
+# stamped by web/make_exe.py at build time so a frozen binary can name its own
+# commit. Never committed: _version() only trusts it when frozen, so a stale
+# copy in a working tree can never outrank git.
+src/product/_build_version.py
+
 .vercel

@@ -13,6 +13,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+pytest.importorskip("sbi", reason="pip install -r requirements-research.txt")
+
 from src import modes, npe
 
 

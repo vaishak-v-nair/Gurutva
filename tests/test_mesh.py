@@ -4,8 +4,16 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# The research stack is not needed to check the product, and pinning it into
+# the default install broke `pip install -r requirements.txt` on every Python
+# below 3.14. It lives in requirements-research.txt now, so this module skips
+# rather than erroring at collection when it is absent.
+pytest.importorskip("discretize",
+                    reason="pip install -r requirements-research.txt")
 
 from src import forge_data, mesh as mesh_mod
 

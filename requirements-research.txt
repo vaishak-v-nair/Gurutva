@@ -1,0 +1,21 @@
+# The reproduction environment. Only needed to re-run the research results:
+# the Utah FORGE re-inversion, the S1/S2/S2.5/S3 neural work, and the tests
+# that gate them. Everything in the product -- the gates, the verdict, the
+# window, the CLI -- runs on requirements.txt alone.
+#
+#     pip install -r requirements.txt -r requirements-research.txt
+#
+# These pins ARE load-bearing and stay exact: reproduction results are
+# validated against these versions, and the SimPEG pin in particular is the
+# reference the forward operator was checked against to ~1e-8 relative.
+# Established 2026-07-29 on Python 3.14.6; these versions are 3.14-only.
+
+simpeg==0.25.2
+discretize==0.12.0
+numpy==2.5.1
+scipy==1.18.0
+pandas==3.0.3
+matplotlib==3.11.1
+pytest==9.1.1
+sbi==0.26.1
+torch==2.13.0

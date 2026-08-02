@@ -15,6 +15,8 @@ import numpy as np
 import pytest
 from scipy.constants import G
 
+pytest.importorskip("simpeg", reason="pip install -r requirements-research.txt")
+
 import discretize
 from simpeg import maps
 from simpeg.potential_fields import gravity

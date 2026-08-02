@@ -1,0 +1,66 @@
+name: tests
+
+# 172 tests that only ever ran on one laptop are not evidence to anyone else,
+# and the repo is public and asking to be checked. This also exists to prove
+# the thing it was written alongside: requirements.txt used to be pinned to
+# Python 3.14 wheels, so `pip install -r requirements.txt && pytest` -- the
+# command the README gives a sceptic -- could not resolve on 3.10-3.13. A
+# matrix is the only way that stays fixed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product:
+    name: product layer, Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Exactly the command the README tells a stranger to run. If this step
+      # fails, the README is lying to them.
+      - name: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: pytest
+        run: pytest -q --tb=short
+
+      # A run where every test skipped would be green and worthless. The
+      # product suite must actually execute on the minimal install.
+      - name: the product tests actually ran, not skipped
+        run: |
+          pytest -q --tb=short \
+            tests/test_product.py tests/test_cli.py tests/test_survey.py \
+            tests/test_exe.py tests/test_prior.py tests/test_joint.py \
+            tests/test_posterior.py tests/test_gurutva_core.py
+
+  windows:
+    name: the window imports on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      # tkinter ships with CPython on Windows; this is the surface most users
+      # meet, and it has never been checked anywhere but one machine.
+      - name: import the window
+        run: python -c "import src.product.app; print('window imports ok')"
+      - run: pytest -q --tb=short

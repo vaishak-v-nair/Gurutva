@@ -72,7 +72,24 @@ FIELDS = {
 
 def _version():
     """Stamp the report with the commit it came from. An auditable document
-    that cannot say which code produced it is not auditable."""
+    that cannot say which code produced it is not auditable.
+
+    A frozen build has no repository and no git, so `git rev-parse` fails and
+    this returned a bare "gurutva" -- meaning every report the SHIPPED product
+    wrote was the one kind this docstring calls not auditable, while every
+    report from a dev checkout was fine. Found by running the released binary
+    and reading its output, not by reading this function.
+
+    So the build stamps the version in, and that file is the first thing
+    checked. `web/make_exe.py` writes it; it is gitignored, and it is only
+    trusted when frozen so a stale copy in a working tree cannot outrank git.
+    """
+    if getattr(sys, "frozen", False):
+        try:
+            from ._build_version import BUILD_VERSION
+            return f"gurutva {BUILD_VERSION}"
+        except ImportError:            # a build that forgot to stamp itself
+            return "gurutva (unstamped build)"
     try:
         h = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
                            cwd=Path(__file__).resolve().parents[2],

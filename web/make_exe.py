@@ -102,7 +102,10 @@ def splash(work):
     return out
 
 
-VERSION = (0, 1, 0, 0)
+# Bump this with the release tag. It feeds both the Windows version resource
+# and the string a frozen build stamps on every report it writes, so a stale
+# value here means a report that names the wrong build.
+VERSION = (0, 1, 2, 0)
 
 VERSION_RESOURCE = """
 VSVersionInfo(
@@ -149,6 +152,32 @@ def version_file(work):
     return out
 
 
+def stamp_version():
+    """Write the version the frozen build will report as its own.
+
+    The released binary stamped every report `gurutva` with no commit,
+    because `_version()` shells out to git and a frozen build has neither a
+    repository nor git. A report that cannot name the code that produced it
+    is exactly what this project says an auditable document is not.
+
+    Written into the package so PyInstaller picks it up as an ordinary
+    module; gitignored so a working tree never carries one, and `_version()`
+    only trusts it when frozen.
+    """
+    sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                         capture_output=True, text=True).stdout.strip()
+    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT,
+                           capture_output=True, text=True).stdout.strip()
+    v = ".".join(str(n) for n in VERSION[:3])
+    label = f"{v}+{sha or 'nogit'}" + ("-dirty" if dirty else "")
+    out = ROOT / "src" / "product" / "_build_version.py"
+    out.write_text(
+        '"""Written by web/make_exe.py at build time. Not in git."""\n\n'
+        f'BUILD_VERSION = "{label}"\n', encoding="utf-8")
+    print(f"stamped: {label}")
+    return label
+
+
 def build(onedir=False):
     """One file, or one folder.
 
@@ -166,7 +195,9 @@ def build(onedir=False):
            "--distpath", str(dist), "--workpath", str(work),
            "--specpath", str(work),
            "--version-file", str(version_file(work)),
+           "--hidden-import", "src.product._build_version",
            "--paths", str(ROOT)]
+    stamp_version()
     if not onedir:                     # a folder build has nothing to unpack
         cmd += ["--splash", str(splash(work))]
     for src, dest in DATA:

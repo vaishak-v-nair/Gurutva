@@ -9,7 +9,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
+
+torch = pytest.importorskip("torch",
+                            reason="pip install -r requirements-research.txt")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 

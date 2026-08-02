@@ -1,12 +1,23 @@
-# Pinned environment — gravity-posterior (established 2026-07-29, Python 3.14.6)
-# The SimPEG pin is load-bearing: reproduction results are validated against
-# this exact version. Do not upgrade mid-phase.
-simpeg==0.25.2
-discretize==0.12.0
-numpy==2.5.1
-scipy==1.18.0
-pandas==3.0.3
-matplotlib==3.11.1
-pytest==9.1.1
-sbi==0.26.1
-torch==2.13.0
+# What you need to run Gurutva and check its claims.
+#
+#     pip install -r requirements.txt && pytest
+#
+# This file used to carry the whole research environment, pinned exactly to
+# Python 3.14 (numpy==2.5.1, scipy==1.18.0, pandas==3.0.3). None of those has
+# a wheel for 3.10-3.13, so the command above -- the one the README hands a
+# sceptic -- could not resolve on the very Python versions the docs promise.
+# A broken verification path is the worst possible defect in a project whose
+# whole claim is "check the numbers without trusting me".
+#
+# Floors, not pins: the product layer is closed-form linear algebra and does
+# not turn on a specific minor version. The reproduction environment, which
+# genuinely does, is pinned in requirements-research.txt.
+#
+# Tests needing the research stack skip themselves and name the file to
+# install. CI runs this file on 3.11 through 3.14, so it cannot silently rot
+# again.
+
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+pytest>=7.4
