@@ -22,3 +22,5 @@ web/Gurutva-windows.zip
 # written by `Gurutva.exe --where` wherever it is run from
 gurutva-where.log
 gurutva.log
+
+.vercel

@@ -7,14 +7,14 @@
 [![release](https://img.shields.io/github/v/release/vaishak-v-nair/Gurutva?color=%230a7b52&label=download)](https://github.com/vaishak-v-nair/Gurutva/releases/latest)
 [![licence](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
 [![tests](https://img.shields.io/badge/tests-172%20passing-%230a7b52)](tests/)
-[![page](https://img.shields.io/badge/site-gurutva-black)](https://vaishak-v-nair.github.io/Gurutva/)
+[![page](https://img.shields.io/badge/site-gurutva-black)](https://gurutva.vercel.app/)
 
 ## Start here
 
 | I want to… | do this |
 |---|---|
 | **just use it** | [Download `Gurutva.exe`](https://github.com/vaishak-v-nair/Gurutva/releases/latest) and double-click. No Python, no install, no admin rights. |
-| **see it before I install anything** | [The page](https://vaishak-v-nair.github.io/Gurutva/) runs the argument in your browser. |
+| **see it before I install anything** | [The page](https://gurutva.vercel.app/) runs the argument in your browser. |
 | **read the code first** | Start at [`src/product/verdict.py`](src/product/verdict.py) (the gates) and [`src/product/prior.py`](src/product/prior.py) (the prior the gates demanded). |
 | **check the claims** | `pip install -r requirements.txt && pytest` — 172 tests, including one for every bug ever introduced. |
 | **tell me it's wrong** | [Open an issue](https://github.com/vaishak-v-nair/Gurutva/issues). This is the most useful thing you can do. |

@@ -2,7 +2,7 @@
 
 One page. Plain sentences. Every number below is generated from a shipped run, not written by hand.
 
-Live page: https://vaishak-v-nair.github.io/Gurutva/
+Live page: https://gurutva.vercel.app/
 Code: https://github.com/vaishak-v-nair/Gurutva (public, Apache-2.0)
 Download: https://github.com/vaishak-v-nair/Gurutva/releases/latest
 

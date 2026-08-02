@@ -26,6 +26,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = json.loads((ROOT / "web" / "demo_data.json").read_text())
 
 REPO = "https://github.com/vaishak-v-nair/Gurutva"
+# Vercel is the address; GitHub Pages serves the same bytes as a mirror, so
+# both are canonicalised here to keep search engines and link unfurlers from
+# treating them as two competing copies.
+SITE = "https://gurutva.vercel.app"
 # `releases/latest/download/<asset>` always resolves to the newest release
 # carrying that asset name, so the page never has to be rebuilt to point at a
 # new version. The asset name is therefore load-bearing: make_release.py
@@ -546,15 +550,15 @@ your data actually support, and refuses to answer when it cannot.">
 <meta property="og:description" content="Inversion software draws you one
 picture of what is underground. Gurutva tells you which parts your data
 actually support, and refuses to answer when it cannot.">
-<meta property="og:url" content="https://vaishak-v-nair.github.io/Gurutva/">
+<meta property="og:url" content="{SITE}/">
 <meta property="og:image"
-      content="https://vaishak-v-nair.github.io/Gurutva/social-preview.png">
+      content="{SITE}/social-preview.png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image"
-      content="https://vaishak-v-nair.github.io/Gurutva/social-preview.png">
-<link rel="canonical" href="https://vaishak-v-nair.github.io/Gurutva/">
+      content="{SITE}/social-preview.png">
+<link rel="canonical" href="{SITE}/">
 </head>
 <body>
 {html}
