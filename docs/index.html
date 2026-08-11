@@ -81,20 +81,6 @@ header{padding:40px 0 0}
 .worlds .truth canvas{border-color:var(--ink);border-width:2px}
 .worlds .truth figcaption{color:var(--ink);font-weight:600}
 .worlds .sep{border-left:1px solid var(--line);padding-left:12px}
-.ss{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center;
-  margin:14px 0 12px}
-.ss-shot{background:#c42b1c;color:#fff;border-radius:6px;padding:14px 14px 16px;
-  font-family:var(--ui);line-height:1.35}
-.ss-t{font-size:15px;font-weight:600;margin-bottom:7px}
-.ss-b{font-size:11px;opacity:.93}
-.ss-more{font-size:11px;margin-top:9px;text-decoration:underline;
-  font-weight:600}
-.ss-steps{margin:0;padding-left:20px;font-size:15px}
-.ss-steps li{margin:0 0 7px}
-.verify{font-size:13px;font-family:var(--ui)}
-.verify code{font-size:11px;word-break:break-all}
-.verify span{color:var(--mut)}
-@media (max-width:640px){.ss{grid-template-columns:1fr}}
 .rep{display:block;margin-top:10px;font-family:var(--ui);font-size:12.5px;
   font-weight:600;text-decoration-thickness:1.5px}
 .repnote{font-family:var(--ui);font-size:13px;color:var(--mut);
@@ -241,34 +227,12 @@ footer{border-top:1px solid var(--line);padding:22px 0 60px;
     <span class="getnote">71&nbsp;MB. Double-click it. Runs on your
       laptop; your survey is never uploaded anywhere.</span>
   </div>
-  <div class="need"><b>Windows will show you a red screen. It is expected,
-    and here is exactly what to do.</b>
-    <div class="ss">
-      <div class="ss-shot" aria-hidden="true">
-        <div class="ss-t">Windows protected your PC</div>
-        <div class="ss-b">Microsoft Defender SmartScreen prevented an
-          unrecognised app from starting.</div>
-        <div class="ss-more">More info</div>
-      </div>
-      <ol class="ss-steps">
-        <li>Click <b>More info</b> &mdash; the small link. It is the only way
-          to reveal the next button.</li>
-        <li>Click <b>Run anyway</b>.</li>
-      </ol>
-    </div>
-    <p>That screen means <b>nobody has bought a code-signing certificate for
-    this file yet</b>. It is not a virus scan and it is not a detection: every
-    unsigned program from an individual developer gets it, on day one, until
-    enough people have downloaded it. Do not take my word for it &mdash;
-    check the file yourself:</p>
-    <p class="verify">SHA-256 <code>4edf0719abad3727d586b5409ada30bb9d2fa5ddf38ed8ba1b0f19e62ea6e727</code><br>
-    <span>Windows: <code>certutil -hashfile Gurutva.exe SHA256</code> &nbsp;·&nbsp;
-    or upload it to <a href="https://www.virustotal.com/gui/home/upload"
-    rel="noopener">VirusTotal</a> and see for yourself.</span></p>
-    <p>Rather not run a stranger's executable at all? Reasonable.
-    <a data-src-zip href="#get" download="gurutva.zip">The
-    65&nbsp;KB Python version</a> is the same code, small enough to read
-    before you run it, and needs <code>numpy scipy matplotlib</code>.</p></div>
+  <div class="need">No Python, no install, no admin rights. The first time
+    you open it, Windows asks you to confirm: click <b>More&nbsp;info</b>,
+    then <b>Run&nbsp;anyway</b>, and it starts. Prefer to read the source
+    first? <a data-src-zip href="#get" download="gurutva.zip">The
+    65&nbsp;KB Python version</a> is the same code, and needs
+    <code>numpy scipy matplotlib</code>.</div>
 </div></section>
 
 <section id="play"><div class="wrap">

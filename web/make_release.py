@@ -50,19 +50,21 @@ def checks():
         if "Repository private" in html or "access on request" in html:
             problems.append("the page still calls the repository private")
 
-        # The page prints the SHA-256 next to "check the file yourself". If it
-        # is the digest of a PREVIOUS build, that instruction actively tells a
-        # careful user the download was tampered with -- the exact opposite of
-        # its purpose, on a product whose whole pitch is "verify me". This
-        # shipped once: the binary was rebuilt for v0.1.2 and the page was not.
+        # The page no longer prints a SHA-256 -- Vaishak's call, 2026-08-04:
+        # verification detail on the landing page reads as a warning and
+        # scares the users it was meant to reassure. The digest still ships in
+        # the release notes for anyone who wants it. The invariant that
+        # remains: the page may carry NO hash, but it must never carry a
+        # WRONG one -- a stale digest shipped once (v0.1.1's hash beside
+        # v0.1.2's download) and told careful users the file was tampered with.
         if EXE.exists():
             digest = sha256(EXE)
-            if digest not in html:
-                stale = re.findall(r"\b[0-9a-f]{64}\b", html)
+            stale = [h for h in re.findall(r"\b[0-9a-f]{64}\b", html)
+                     if h != digest]
+            if stale:
                 problems.append(
-                    f"the page advertises a different SHA-256 than the binary "
-                    f"being released. page says {stale[0][:16] if stale else 'none'}"
-                    f"..., binary is {digest[:16]}... -- rebuild the page")
+                    f"the page carries a SHA-256 that is not this binary's: "
+                    f"{stale[0][:16]}... vs {digest[:16]}... -- rebuild the page")
 
     lic = (ROOT / "LICENSE").read_text(encoding="utf-8", errors="replace")
     if "Apache License" not in lic:

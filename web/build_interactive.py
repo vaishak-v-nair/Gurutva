@@ -17,7 +17,6 @@ Run: py -3 web/make_demo_data.py && py -3 web/build_interactive.py
 """
 
 import base64
-import hashlib
 import json
 import re
 from pathlib import Path
@@ -37,10 +36,12 @@ SITE = "https://gurutva.vercel.app"
 EXE_URL = f"{REPO}/releases/latest/download/Gurutva.exe"
 _EXE = ROOT / "dist" / "onefile" / "Gurutva.exe"
 EXE_MB = round(_EXE.stat().st_size / 1e6) if _EXE.exists() else 71
-# Printed on the page so the SmartScreen warning has an answer next to it
-# rather than a promise. make_release.py publishes the same digest.
-EXE_SHA = (hashlib.sha256(_EXE.read_bytes()).hexdigest()
-           if _EXE.exists() else "build the binary first")
+# The SHA-256 is deliberately NOT on the page any more (2026-08-04): a hash
+# and a tamper-check instruction on a landing page read as a warning, and the
+# people this page is for found it frightening rather than reassuring. The
+# digest still ships in every release's notes, where the audience that wants
+# it goes looking. make_release.py enforces the residual invariant: the page
+# may carry no hash, but never a wrong one.
 
 # The source zip is still built and still embedded: it is 61 KB, it needs
 # Python, and it is what someone reads if they want to see what they are
@@ -108,20 +109,6 @@ header{padding:40px 0 0}
 .worlds .truth canvas{border-color:var(--ink);border-width:2px}
 .worlds .truth figcaption{color:var(--ink);font-weight:600}
 .worlds .sep{border-left:1px solid var(--line);padding-left:12px}
-.ss{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center;
-  margin:14px 0 12px}
-.ss-shot{background:#c42b1c;color:#fff;border-radius:6px;padding:14px 14px 16px;
-  font-family:var(--ui);line-height:1.35}
-.ss-t{font-size:15px;font-weight:600;margin-bottom:7px}
-.ss-b{font-size:11px;opacity:.93}
-.ss-more{font-size:11px;margin-top:9px;text-decoration:underline;
-  font-weight:600}
-.ss-steps{margin:0;padding-left:20px;font-size:15px}
-.ss-steps li{margin:0 0 7px}
-.verify{font-size:13px;font-family:var(--ui)}
-.verify code{font-size:11px;word-break:break-all}
-.verify span{color:var(--mut)}
-@media (max-width:640px){.ss{grid-template-columns:1fr}}
 .rep{display:block;margin-top:10px;font-family:var(--ui);font-size:12.5px;
   font-weight:600;text-decoration-thickness:1.5px}
 .repnote{font-family:var(--ui);font-size:13px;color:var(--mut);
@@ -388,34 +375,12 @@ def build():
     <span class="getnote">{EXE_MB}&nbsp;MB. Double-click it. Runs on your
       laptop; your survey is never uploaded anywhere.</span>
   </div>
-  <div class="need"><b>Windows will show you a red screen. It is expected,
-    and here is exactly what to do.</b>
-    <div class="ss">
-      <div class="ss-shot" aria-hidden="true">
-        <div class="ss-t">Windows protected your PC</div>
-        <div class="ss-b">Microsoft Defender SmartScreen prevented an
-          unrecognised app from starting.</div>
-        <div class="ss-more">More info</div>
-      </div>
-      <ol class="ss-steps">
-        <li>Click <b>More info</b> &mdash; the small link. It is the only way
-          to reveal the next button.</li>
-        <li>Click <b>Run anyway</b>.</li>
-      </ol>
-    </div>
-    <p>That screen means <b>nobody has bought a code-signing certificate for
-    this file yet</b>. It is not a virus scan and it is not a detection: every
-    unsigned program from an individual developer gets it, on day one, until
-    enough people have downloaded it. Do not take my word for it &mdash;
-    check the file yourself:</p>
-    <p class="verify">SHA-256 <code>{EXE_SHA}</code><br>
-    <span>Windows: <code>certutil -hashfile Gurutva.exe SHA256</code> &nbsp;·&nbsp;
-    or upload it to <a href="https://www.virustotal.com/gui/home/upload"
-    rel="noopener">VirusTotal</a> and see for yourself.</span></p>
-    <p>Rather not run a stranger's executable at all? Reasonable.
-    <a data-src-zip href="#get" download="gurutva.zip">The
-    {ZIP_KB}&nbsp;KB Python version</a> is the same code, small enough to read
-    before you run it, and needs <code>numpy scipy matplotlib</code>.</p></div>
+  <div class="need">No Python, no install, no admin rights. The first time
+    you open it, Windows asks you to confirm: click <b>More&nbsp;info</b>,
+    then <b>Run&nbsp;anyway</b>, and it starts. Prefer to read the source
+    first? <a data-src-zip href="#get" download="gurutva.zip">The
+    {ZIP_KB}&nbsp;KB Python version</a> is the same code, and needs
+    <code>numpy scipy matplotlib</code>.</div>
 </div></section>
 
 <section id="play"><div class="wrap">
