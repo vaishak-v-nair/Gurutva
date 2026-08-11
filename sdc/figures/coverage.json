@@ -1,0 +1,254 @@
+{
+  "allreduce/0": {
+    "site": "allreduce",
+    "bit": 0,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/6": {
+    "site": "allreduce",
+    "bit": 6,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/12": {
+    "site": "allreduce",
+    "bit": 12,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/18": {
+    "site": "allreduce",
+    "bit": 18,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/22": {
+    "site": "allreduce",
+    "bit": 22,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/23": {
+    "site": "allreduce",
+    "bit": 23,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/27": {
+    "site": "allreduce",
+    "bit": 27,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/30": {
+    "site": "allreduce",
+    "bit": 30,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "allreduce/31": {
+    "site": "allreduce",
+    "bit": 31,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 1512
+  },
+  "optim_state/0": {
+    "site": "optim_state",
+    "bit": 0,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/6": {
+    "site": "optim_state",
+    "bit": 6,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/12": {
+    "site": "optim_state",
+    "bit": 12,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/18": {
+    "site": "optim_state",
+    "bit": 18,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/22": {
+    "site": "optim_state",
+    "bit": 22,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/23": {
+    "site": "optim_state",
+    "bit": 23,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/27": {
+    "site": "optim_state",
+    "bit": 27,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 3024
+  },
+  "optim_state/30": {
+    "site": "optim_state",
+    "bit": 30,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 756
+  },
+  "optim_state/31": {
+    "site": "optim_state",
+    "bit": 31,
+    "rate": 1.0,
+    "detector": "checksum",
+    "injections": 756
+  },
+  "gemm_out/0": {
+    "site": "gemm_out",
+    "bit": 0,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/6": {
+    "site": "gemm_out",
+    "bit": 6,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/12": {
+    "site": "gemm_out",
+    "bit": 12,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/18": {
+    "site": "gemm_out",
+    "bit": 18,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/22": {
+    "site": "gemm_out",
+    "bit": 22,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/23": {
+    "site": "gemm_out",
+    "bit": 23,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/27": {
+    "site": "gemm_out",
+    "bit": 27,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "gemm_out/30": {
+    "site": "gemm_out",
+    "bit": 30,
+    "rate": 1.0,
+    "detector": "norm",
+    "injections": 54
+  },
+  "gemm_out/31": {
+    "site": "gemm_out",
+    "bit": 31,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 648
+  },
+  "activation/0": {
+    "site": "activation",
+    "bit": 0,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/6": {
+    "site": "activation",
+    "bit": 6,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/12": {
+    "site": "activation",
+    "bit": 12,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/18": {
+    "site": "activation",
+    "bit": 18,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/22": {
+    "site": "activation",
+    "bit": 22,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/23": {
+    "site": "activation",
+    "bit": 23,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/27": {
+    "site": "activation",
+    "bit": 27,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  },
+  "activation/30": {
+    "site": "activation",
+    "bit": 30,
+    "rate": 1.0,
+    "detector": "norm",
+    "injections": 20
+  },
+  "activation/31": {
+    "site": "activation",
+    "bit": 31,
+    "rate": 0.0,
+    "detector": null,
+    "injections": 144
+  }
+}

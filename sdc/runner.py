@@ -166,7 +166,7 @@ def train(
 
         # Optimizer state was stamped at the end of the previous step; anything
         # that happened to it since is caught here, before it is read.
-        if guards is not None:
+        if guards is not None and guards.checks_optim(step):
             for key, tensor in _optim_states(model, opt):
                 guards.checksum.verify_(key, tensor, step, "optim_state")
 
@@ -194,8 +194,10 @@ def train(
 
         opt.step()
 
-        # Stamp the moments as written, before anything can touch them.
-        if guards is not None:
+        # Stamp the moments as written, before anything can touch them. Under a
+        # stride > 1 the stamp is taken on the step that will next be verified,
+        # so the pairing stays exact and the skipped steps are simply uncovered.
+        if guards is not None and guards.checks_optim(step + 1):
             for key, tensor in _optim_states(model, opt):
                 guards.checksum.stamp_(key, tensor)
 

@@ -1,4 +1,4 @@
-# sdc — Phase 0: a fault-injection harness
+# sdc — fault injection (Phase 0) and L0 detection (Phase 1)
 
 *Unrelated to the gravity inversion in the rest of this repository.* Parked here
 because the session that wrote it could not create a new remote; imports nothing
@@ -125,11 +125,121 @@ and genuinely pass. These are *not* validated and are marked so in the code:
 `torch.set_num_threads(1)` is required for Gate 0.2 on CPU; the container default
 was 4, under which reduction order varies.
 
+---
+
+# Phase 1 — L0 detectors
+
+**Status: built, 61/61 gates passing.** One gate is *unmeasurable on this
+hardware* rather than passed or failed, and is reported that way below.
+
+## What Phase 0 forced to change
+
+The plan's L0 was built around loss and gradient-norm watching. Phase 0 falsified
+that: the loss cannot resolve low-mantissa corruption **at all**, because the gap
+sits at one ULP of the loss value. That is a representation floor, not a
+statistical one, and no threshold recovers a signal below the resolution of the
+quantity being thresholded. Loss watching was demoted to a weak corroborator and
+the load moved onto checksums.
+
+## The design point: the checksum lives in the integer domain
+
+A float sum fails for exactly the reason the loss fails — floating-point addition
+is lossy, and a mantissa-LSB flip moves the sum by less than the sum's own ULP.
+Reinterpret the same bits as integers and that flip becomes a change of exactly
+±2ᵏ, which no accumulator can round away. Detection becomes **exact rather than
+statistical, at the same cost.** A test demonstrates the float version missing a
+flip the integer version catches, rather than asserting it.
+
+Two accumulators, both O(n) and vectorised:
+
+- **plain modular sum** — catches any single flip.
+- **index-weighted modular sum** — closes the plain sum's blind spot, where two
+  flips of the same bit index (one 0→1, one 1→0) contribute +2ᵏ and −2ᵏ and cancel
+  exactly. Weights are `(i mod P) + 1`, never 0, or a flip at index 0 would be
+  invisible to the weighted accumulator.
+
+## The result: coverage is a partition, not a gradient
+
+![coverage](figures/coverage.png)
+
+| Site | Reference copy? | Caught by | Cost |
+|---|---|---|---|
+| `allreduce` | yes — before/after transport | checksum, **every bit** | 2 passes |
+| `optim_state` | yes — across write/read | checksum, **every bit** | 4 passes |
+| `gemm_out` | **no** | nothing subtle; NaN only | — |
+| `activation` | **no** | nothing subtle; NaN only | — |
+
+The bottom half is **structural, not a shortfall**. A GEMM output is the only copy
+of itself; there is no uncorrupted reference to compare against, so this layer
+cannot catch corruption there at any price. That is the entire argument for L1 and
+L2 existing, and two gates pin it deliberately — `test_checksum_cannot_see_
+unreferenced_sites` and `test_subtle_arithmetic_is_caught_by_nothing`. If the
+latter ever starts passing, L0 got stronger and the plan's cost model needs
+revisiting.
+
+## Gates
+
+| Gate | Claim | Result |
+|---|---|---|
+| **1.1** | Checksum catches 100% at referenced sites, **every bit incl. 0** | ✅ pass |
+| **1.2** | Same-bit-index pair still caught (plain sum alone fails) | ✅ pass |
+| **1.3** | Zero false positives across 8 clean seeds | ✅ pass, K disclosed |
+| **1.4** | Wall-clock overhead <1% | ⚠️ **unmeasurable here** — see below |
+| **1.5** | Honest failure at unreferenced sites | ✅ pass *by documenting it* |
+
+## Gate 1.4 — reported as unmeasurable, not as a number
+
+![overhead](figures/overhead.png)
+
+The wall-clock arm of this gate **cannot be evaluated on this container.**
+Repeating the *same unguarded configuration* and measuring its spread gave a noise
+floor of 4.9%, then 58.7%, then 205% on three separate attempts. Several A/B
+measurements returned negative overhead, which is impossible and therefore
+diagnostic. The instrument is less stable than the effect being measured, so no
+wall-clock number here is reportable.
+
+What *is* trustworthy is the analytic model, which is deterministic and does not
+depend on machine load:
+
+| optim stride | passes over params/step | detector:step bytes | detector:step FLOPs |
+|---|---|---|---|
+| 1 | 6.00 | 405% | 0.391% |
+| 8 | 2.50 | 169% | 0.163% |
+| 32 | 2.12 | 143% | 0.138% |
+
+Four of the six passes are optimizer state (two moments, stamped and verified), so
+striding those to every Nth step is the dominant lever — `Guards(optim_stride=8)`
+cuts 6 passes to 2.5. The floor is 2: gradients are stamped and verified every
+step and cannot be strided, because a gradient exists for one step only and a
+missed check is a permanently missed corruption. **Striding trades coverage for
+cost and the trade is real** — optimizer corruption between checked steps is
+missed outright.
+
+The honest reading: against step *FLOPs* the layer is already well under 1%, but
+it is memory-heavy against a model this small. Whether it lands under 1% in
+practice depends on whether the real step is compute-bound or memory-bound, which
+is a GPU question this container cannot answer. **Gate 1.4 is deferred to hardware,
+not claimed.**
+
+## A bug the sweep caught that review did not
+
+`NormMonitor` silently ignored non-finite values. Every comparison against NaN is
+False, so a z-score test skipped the single loudest signal available — a NaN
+gradient norm produced no alarm at all. Found by noticing that catastrophic
+`gemm_out` corruption showed `norm=False` in the coverage sweep. Fixed, with a
+regression gate.
+
 ## Next
 
-Phase 1 (L0 detectors) needs the invisible regime above as its target, and needs
-its false-positive rate measured against the clean corpus this harness generates.
-The bf16 repeat is open: bf16's mantissa LSB is ~2⁻⁷ ≈ 0.8% relative error rather
-than fp32's 1.2e-7, so the invisible band should be far narrower — possibly absent.
-Whether that makes detection easier or harder against noisier gradients is an
-empirical question this harness can now answer.
+**Phase 2 — localization.** Detection without "which device" is not actionable.
+The checksum already knows *which tensor* failed; mapping that to a device needs
+the simulated topology.
+
+**bf16, still open and cheap.** bf16's mantissa LSB is ~2⁻⁷ ≈ 0.8% relative error
+against fp32's 1.2e-7, so the invisible band should be far narrower or absent.
+Since real training is bf16, this decides whether the invisible regime is a
+production concern or an fp32 artifact — load-bearing for the pitch, and answerable
+by changing one dtype.
+
+**On GPU, in order:** does Gate 0.2 (clean determinism) survive CUDA at all — the
+declared kill condition — then Gate 1.4 on a quiet machine.

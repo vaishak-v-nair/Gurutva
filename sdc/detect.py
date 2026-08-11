@@ -76,8 +76,21 @@ class Stamp:
         )
 
 
+_WEIGHT_CACHE: dict[tuple[int, str], torch.Tensor] = {}
+
+
 def _weights(n: int, device: torch.device) -> torch.Tensor:
-    return torch.arange(n, device=device, dtype=torch.int64) % _WMOD + 1
+    """Position weights, cached by (size, device).
+
+    Rebuilding these per call would dominate the checksum's own cost and make the
+    overhead gate measure the allocator rather than the checksum.
+    """
+    key = (n, str(device))
+    cached = _WEIGHT_CACHE.get(key)
+    if cached is None:
+        cached = torch.arange(n, device=device, dtype=torch.int64) % _WMOD + 1
+        _WEIGHT_CACHE[key] = cached
+    return cached
 
 
 def stamp(tensor: torch.Tensor) -> Stamp:
@@ -205,10 +218,26 @@ class NormMonitor:
 
 @dataclass
 class Guards:
-    """The L0 bundle attached to a run."""
+    """The L0 bundle attached to a run.
+
+    ``optim_stride`` trades coverage for cost. Optimizer state is two moments per
+    parameter, and stamping plus verifying both accounts for four of the six
+    passes this layer makes over parameter-sized memory each step — the dominant
+    term, since the checksum is memory-bound. Checking every Nth step cuts that
+    to 4/N.
+
+    The cost is real and must not be glossed: corruption of optimizer state
+    between checked steps is missed outright. Gradients stay checked every step,
+    because a gradient exists for one step only and a missed check is a permanently
+    missed corruption.
+    """
 
     checksum: ChecksumGuard = field(default_factory=ChecksumGuard)
     norm: NormMonitor = field(default_factory=NormMonitor)
+    optim_stride: int = 1
+
+    def checks_optim(self, step: int) -> bool:
+        return step % self.optim_stride == 0
 
     @property
     def alarms(self) -> list[Alarm]:
