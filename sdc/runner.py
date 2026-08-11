@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass
 
 import torch
 
+from .detect import Guards
 from .inject import Injector
 from .model import ModelConfig, TinyTransformer
 from .record import (
@@ -107,14 +108,41 @@ def make_batches(cfg: TrainConfig) -> list[tuple[torch.Tensor, torch.Tensor]]:
     return batches
 
 
-def train(cfg: TrainConfig, injector: Injector | None = None) -> RunRecord:
-    """Run training. Attaching an injector is the only difference between modes."""
+def _optim_states(model, opt):
+    """(key, tensor) for every Adam moment currently allocated. Stable order."""
+    for i, p in enumerate(model.parameters()):
+        state = opt.state.get(p, {})
+        for name in ("exp_avg", "exp_avg_sq"):
+            if name in state:
+                yield f"optim/{i}/{name}", state[name]
+
+
+def _grads(model):
+    for i, p in enumerate(model.parameters()):
+        if p.grad is not None:
+            yield f"grad/{i}", p.grad
+
+
+def train(
+    cfg: TrainConfig,
+    injector: Injector | None = None,
+    guards: Guards | None = None,
+) -> RunRecord:
+    """Run training. Attaching an injector is the only difference between modes.
+
+    ``guards`` attaches the L0 detectors. Stamps are taken where the data is
+    known good and verified where it is consumed, which is how the checksum
+    deploys for real — at the sender and at the receiver of a collective, and
+    across the write/read boundary of optimizer state.
+    """
     set_determinism(cfg.seed)
 
     model = TinyTransformer(cfg.model)
     model.attach_injector(injector)
     if injector is not None:
         injector.reset()
+    if guards is not None:
+        guards.reset()
 
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr)
     batches = make_batches(cfg)
@@ -136,9 +164,20 @@ def train(cfg: TrainConfig, injector: Injector | None = None) -> RunRecord:
         before = snapshot(model)
         seen = len(injector.events) if injector is not None else 0
 
+        # Optimizer state was stamped at the end of the previous step; anything
+        # that happened to it since is caught here, before it is read.
+        if guards is not None:
+            for key, tensor in _optim_states(model, opt):
+                guards.checksum.verify_(key, tensor, step, "optim_state")
+
         opt.zero_grad(set_to_none=True)
         loss = model(x, y)
         loss.backward()
+
+        # "At the sender", before the collective.
+        if guards is not None:
+            for key, tensor in _grads(model):
+                guards.checksum.stamp_(key, tensor)
 
         if injector is not None:
             # Stands in for corruption on the wire during gradient all-reduce.
@@ -148,7 +187,17 @@ def train(cfg: TrainConfig, injector: Injector | None = None) -> RunRecord:
                 if p.grad is not None:
                     injector.corrupt_(p.grad, "allreduce")
 
+        # "At the receiver", after it.
+        if guards is not None:
+            for key, tensor in _grads(model):
+                guards.checksum.verify_(key, tensor, step, "allreduce")
+
         opt.step()
+
+        # Stamp the moments as written, before anything can touch them.
+        if guards is not None:
+            for key, tensor in _optim_states(model, opt):
+                guards.checksum.stamp_(key, tensor)
 
         if injector is not None:
             for group in opt.param_groups:
@@ -159,18 +208,29 @@ def train(cfg: TrainConfig, injector: Injector | None = None) -> RunRecord:
                             injector.corrupt_(state[key], "optim_state")
 
         loss_value = float(loss.detach())
-        record.steps.append(
-            StepRecord(
-                step=step,
-                loss=loss_value,
-                grad_norm=grad_norm(model),
-                weight_delta=delta_norm(model, before),
-                n_injections=(len(injector.events) - seen) if injector else 0,
-            )
+        step_record = StepRecord(
+            step=step,
+            loss=loss_value,
+            grad_norm=grad_norm(model),
+            weight_delta=delta_norm(model, before),
+            n_injections=(len(injector.events) - seen) if injector else 0,
         )
+        record.steps.append(step_record)
+
+        if guards is not None:
+            guards.norm.observe(
+                step,
+                grad_norm=step_record.grad_norm,
+                weight_delta=step_record.weight_delta,
+            )
+
         if loss_value != loss_value or loss_value in (float("inf"), float("-inf")):
             record.diverged = True
             break
+
+    if guards is not None:
+        record.alarms = list(guards.alarms)
+        record.checks = guards.checksum.checks + guards.norm.checks
 
     record.final_fingerprint = fingerprint(model)
     if injector is not None:

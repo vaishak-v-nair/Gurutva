@@ -59,6 +59,15 @@ class RunRecord:
     final_fingerprint: str = ""
     injection_manifest: list[tuple] = field(default_factory=list)
     diverged: bool = False
+    alarms: list = field(default_factory=list)
+    checks: int = 0
+
+    def fired(self, detector: str | None = None, site: str | None = None) -> bool:
+        return any(
+            (detector is None or a.detector == detector)
+            and (site is None or a.site == site)
+            for a in self.alarms
+        )
 
     @property
     def losses(self) -> list[float]:
