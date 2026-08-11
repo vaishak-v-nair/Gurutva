@@ -186,6 +186,57 @@ def test_uppercase_and_padded_headers_are_accepted(tmp_path):
     assert out.exists()
 
 
+def test_real_world_headers_with_datum_suffixes_are_mapped(tmp_path, capsys):
+    """The first real dataset fed to this tool (USGS Southwest Gravity
+    Program, off ScienceBase) says 'Latitude (NAD83)', 'Elevation (m
+    NAVD88)'. Exact aliases missed every one, and a user holding a
+    completely standard agency file was told to rename columns by hand."""
+    p = _write(tmp_path, "usgs.csv",
+               "Longitude (NAD83),Latitude (NAD83),"
+               "Elevation (m NAVD88),Gravity anomaly (mGal)",
+               [f"{-106.5 + i * 0.001},{35.1 + j * 0.001},1650.0,0.01"
+                for i in range(8) for j in range(5)])
+    out = tmp_path / "usgs.html"
+    cli.main(["report", "--survey", p] + BASE + ["--out", str(out)])
+    assert out.exists()
+    said = capsys.readouterr().out
+    assert "columns read as" in said, "the mapping must be said, not silent"
+    assert "longitude_nad83 -> x" in said
+
+
+def test_two_latitude_like_columns_are_refused_not_guessed(tmp_path):
+    """Ambiguity is the user's question to settle. Guessing between
+    'latitude_nad83' and 'latitude_wgs84' silently would be inventing
+    their coordinate system for them."""
+    p = _write(tmp_path, "ambig.csv",
+               "longitude_nad83,latitude_nad83,latitude_wgs84,elev_m,grav",
+               ["-106.5,35.1,35.1,1650.0,0.01"] * 10)
+    with pytest.raises(SystemExit) as e:
+        cli.main(["report", "--survey", p] + BASE
+                 + ["--out", str(tmp_path / "a.html")])
+    msg = str(e.value)
+    assert "more than one column" in msg
+    assert "latitude_nad83" in msg and "latitude_wgs84" in msg
+
+
+def test_continental_span_in_degrees_is_refused_not_read_as_metres(tmp_path):
+    """Found by real data: the SGP network spans ~17 degrees of longitude.
+    looks_geographic's 10-degree ceiling made it fall through and the
+    coordinates were read as METRES -- a 1,800 km network became a '17 m
+    survey' and the error blamed the user's --cell. A silent unit
+    misinterpretation is the exact thing the detector exists to prevent."""
+    p = _write(tmp_path, "usa.csv", "x,y,z,gz",
+               [f"{-114.0 + i * 2.0},{31.0 + i * 0.7 + j * 0.05},1650.0,0.01"
+                for i in range(9) for j in range(2)])
+    with pytest.raises(SystemExit) as e:
+        cli.main(["report", "--survey", p] + BASE
+                 + ["--out", str(tmp_path / "c.html")])
+    msg = str(e.value)
+    assert "degrees" in msg and "km" in msg, "must name the real situation"
+    assert "compilation" in msg
+    assert "--cell" not in msg, "must not blame the user's mesh choice"
+
+
 def test_wrong_units_are_caught_by_the_gates(tmp_path):
     """microGal submitted where mGal is required: 1000x too big. The gates
     must refuse rather than return a confident wrong answer."""

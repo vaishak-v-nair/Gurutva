@@ -105,7 +105,7 @@ def splash(work):
 # Bump this with the release tag. It feeds both the Windows version resource
 # and the string a frozen build stamps on every report it writes, so a stale
 # value here means a report that names the wrong build.
-VERSION = (0, 1, 2, 0)
+VERSION = (0, 1, 3, 0)
 
 VERSION_RESOURCE = """
 VSVersionInfo(

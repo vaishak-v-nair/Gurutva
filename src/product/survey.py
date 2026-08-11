@@ -32,6 +32,29 @@ def looks_geographic(x, y):
     return bool(in_range and tiny_span)
 
 
+def degrees_but_continental(x, y):
+    """The case looks_geographic silently drops, caught and named.
+
+    Found by the first real dataset ever fed to this tool: the USGS Southwest
+    Gravity Program network spans ~17 degrees of longitude. Both columns sit
+    inside +/-180 and +/-90 -- plainly degrees -- but the span fails
+    looks_geographic's 10-degree ceiling, so the coordinates fell through and
+    were treated as METRES. The survey became "17 m wide", and the error the
+    user saw blamed their --cell choice. A silent unit misinterpretation is
+    the exact failure the detector exists to prevent; falling through to the
+    wrong unit is not more honest than guessing.
+
+    Returns the (x_span, y_span) in degrees when the numbers look like
+    degrees but cover more ground than any single survey, else None.
+    """
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    in_range = (np.all(np.abs(x) <= 180.0) and np.all(np.abs(y) <= 90.0))
+    sx, sy = float(x.max() - x.min()), float(y.max() - y.min())
+    if in_range and not (sx < 10.0 and sy < 10.0):
+        return sx, sy
+    return None
+
+
 def project(lon, lat, lon0=None, lat0=None):
     """Longitude/latitude in degrees -> local metres, east-north, WGS84.
 

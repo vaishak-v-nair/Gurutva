@@ -537,6 +537,20 @@ actually support, and refuses to answer when it cannot.">
 <meta name="twitter:image"
       content="{SITE}/social-preview.png">
 <link rel="canonical" href="{SITE}/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2312151a'/%3E%3Cpath d='M14 40 Q24 18 32 30 T50 26' stroke='%23e8f5ef' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M14 46 Q24 30 32 38 T50 34' stroke='%235cd6a0' stroke-width='3' fill='none' stroke-linecap='round' opacity='.75'/%3E%3C/svg%3E">
+<script type="application/ld+json">
+{{"@context": "https://schema.org",
+ "@type": "SoftwareApplication",
+ "name": "Gurutva",
+ "operatingSystem": "Windows",
+ "applicationCategory": "DeveloperApplication",
+ "description": "Posterior uncertainty for gravity and magnetic surveys: which parts of a subsurface model the data actually supports, with a verdict that can refuse to answer.",
+ "offers": {{"@type": "Offer", "price": "0", "priceCurrency": "USD"}},
+ "downloadUrl": "{EXE_URL}",
+ "url": "{SITE}/",
+ "license": "https://www.apache.org/licenses/LICENSE-2.0",
+ "author": {{"@type": "Person", "name": "Vaishak V Nair"}}}}
+</script>
 </head>
 <body>
 {html}

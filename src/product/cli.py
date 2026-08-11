@@ -139,12 +139,50 @@ def load_survey(path):
                "  Header and data must use the same separator."))
     names = tuple(n.strip().lower() for n in (rows.dtype.names or ()))
     rows.dtype.names = names
-    alias = {"lon": "x", "longitude": "x", "easting": "x",
-             "lat": "y", "latitude": "y", "northing": "y",
-             "elev": "z", "elevation": "z", "height": "z",
-             "grav": "gz", "mgal": "gz", "tmi": "gz", "nt": "gz"}
-    names = tuple(alias.get(n, n) for n in names)
+
+    # Real files do not say x,y,z,gz. The first real dataset this was fed --
+    # a USGS Southwest Gravity Program station table, pulled straight off
+    # ScienceBase -- says latitude_nad83, longitude_nad83, elevation_m_navd88:
+    # the datum and the unit ride along in the header. Exact aliases missed
+    # every one, so a user with a completely standard file was told to rename
+    # their columns by hand. So: exact alias first, then a unique PREFIX
+    # match. Ambiguity is refused, never guessed -- two columns both starting
+    # with "lat" is the user's question to settle, not ours.
+    exact = {"x": "x", "lon": "x", "longitude": "x", "easting": "x",
+             "y": "y", "lat": "y", "latitude": "y", "northing": "y",
+             "z": "z", "elev": "z", "elevation": "z", "height": "z",
+             "gz": "gz", "grav": "gz", "gravity": "gz", "mgal": "gz",
+             "tmi": "gz", "nt": "gz"}
+    prefixes = {"x": ("longitude", "lon_", "easting", "east_", "x_"),
+                "y": ("latitude", "lat_", "northing", "north_", "y_"),
+                "z": ("elevation", "elev_", "height", "alt_", "z_"),
+                "gz": ("gz_", "grav", "bouguer", "boug_", "isostatic",
+                       "iso_", "anomaly", "faa_", "tmi_", "mgal")}
+    mapping, ambiguous = {}, []
+    for canon in ("x", "y", "z", "gz"):
+        hits = [n for n in names if exact.get(n) == canon]
+        if not hits:
+            hits = [n for n in names
+                    if n not in exact and
+                    any(n.startswith(p) for p in prefixes[canon])]
+        if len(hits) == 1:
+            mapping[hits[0]] = canon
+        elif len(hits) > 1:
+            ambiguous.append((canon, hits))
+    if ambiguous:
+        lines = "\n".join(f"  {c}: could be any of {', '.join(h)}"
+                          for c, h in ambiguous)
+        raise SystemExit(
+            f"{path}: more than one column could be {', '.join(c for c, _ in ambiguous)}.\n"
+            f"{lines}\n"
+            f"  Gurutva will not guess between them. Rename the one you mean "
+            f"to x,y,z or gz.")
+    names = tuple(mapping.get(n, n) for n in names)
     rows.dtype.names = names
+    renamed = {old: new for old, new in mapping.items() if old != new}
+    if renamed:
+        print("  columns read as: "
+              + ", ".join(f"{o} -> {n}" for o, n in renamed.items()))
     missing = [c for c in ("x", "y", "z", "gz") if c not in names]
     if missing:
         raise SystemExit(
@@ -168,6 +206,18 @@ def load_survey(path):
                          "anything honest about a 3-D density field.")
 
     meta = {"geographic": False}
+    wide = SV.degrees_but_continental(x, y)
+    if wide:
+        raise SystemExit(
+            f"{path}: the coordinates look like lon/lat degrees (all within "
+            f"±180 and ±90) but span {wide[0]:.1f}° × {wide[1]:.1f}° — "
+            f"roughly {wide[0] * 111:.0f} × {wide[1] * 111:.0f} km. That is "
+            f"a compilation, not a survey, and no single density model can "
+            f"honestly cover it.\n"
+            f"  If this is a regional database, cut out one target area and "
+            f"run that.\n"
+            f"  If these numbers really are metres, shift them so they do "
+            f"not sit inside ±180.")
     if SV.looks_geographic(x, y):
         try:
             x, y, pm = SV.project(x, y)
