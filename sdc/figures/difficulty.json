@@ -1,0 +1,271 @@
+{
+  "clean_final_loss": 0.9060803651809692,
+  "steps": 30,
+  "seed": 11,
+  "rows": [
+    {
+      "bit": 31,
+      "field": "sign",
+      "count": 1,
+      "divergence": 7.891654968261719e-05,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 30,
+      "field": "exponent",
+      "count": 1,
+      "divergence": Infinity,
+      "n_injections": 9,
+      "blew_up": true
+    },
+    {
+      "bit": 27,
+      "field": "exponent",
+      "count": 1,
+      "divergence": 4.0531158447265625e-05,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 24,
+      "field": "exponent",
+      "count": 1,
+      "divergence": 7.390975952148438e-05,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 23,
+      "field": "exponent",
+      "count": 1,
+      "divergence": 6.389617919921875e-05,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 22,
+      "field": "mantissa",
+      "count": 1,
+      "divergence": 2.0265579223632812e-05,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 18,
+      "field": "mantissa",
+      "count": 1,
+      "divergence": 9.5367431640625e-07,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 12,
+      "field": "mantissa",
+      "count": 1,
+      "divergence": 1.7881393432617188e-07,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 6,
+      "field": "mantissa",
+      "count": 1,
+      "divergence": 1.1920928955078125e-07,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 2,
+      "field": "mantissa",
+      "count": 1,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 0,
+      "field": "mantissa",
+      "count": 1,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 270,
+      "blew_up": false
+    },
+    {
+      "bit": 31,
+      "field": "sign",
+      "count": 4,
+      "divergence": 0.0077784061431884766,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 30,
+      "field": "exponent",
+      "count": 4,
+      "divergence": Infinity,
+      "n_injections": 36,
+      "blew_up": true
+    },
+    {
+      "bit": 27,
+      "field": "exponent",
+      "count": 4,
+      "divergence": 0.008571147918701172,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 24,
+      "field": "exponent",
+      "count": 4,
+      "divergence": 0.0012552738189697266,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 23,
+      "field": "exponent",
+      "count": 4,
+      "divergence": 0.001741647720336914,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 22,
+      "field": "mantissa",
+      "count": 4,
+      "divergence": 0.0009672641754150391,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 18,
+      "field": "mantissa",
+      "count": 4,
+      "divergence": 8.654594421386719e-05,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 12,
+      "field": "mantissa",
+      "count": 4,
+      "divergence": 1.6689300537109375e-06,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 6,
+      "field": "mantissa",
+      "count": 4,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 2,
+      "field": "mantissa",
+      "count": 4,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 0,
+      "field": "mantissa",
+      "count": 4,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 1080,
+      "blew_up": false
+    },
+    {
+      "bit": 31,
+      "field": "sign",
+      "count": 16,
+      "divergence": 0.014570474624633789,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 30,
+      "field": "exponent",
+      "count": 16,
+      "divergence": Infinity,
+      "n_injections": 144,
+      "blew_up": true
+    },
+    {
+      "bit": 27,
+      "field": "exponent",
+      "count": 16,
+      "divergence": 222.19663101434708,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 24,
+      "field": "exponent",
+      "count": 16,
+      "divergence": 0.00633317232131958,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 23,
+      "field": "exponent",
+      "count": 16,
+      "divergence": 0.0019927024841308594,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 22,
+      "field": "mantissa",
+      "count": 16,
+      "divergence": 0.0004145503044128418,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 18,
+      "field": "mantissa",
+      "count": 16,
+      "divergence": 4.0590763092041016e-05,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 12,
+      "field": "mantissa",
+      "count": 16,
+      "divergence": 7.152557373046875e-07,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 6,
+      "field": "mantissa",
+      "count": 16,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 2,
+      "field": "mantissa",
+      "count": 16,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 4320,
+      "blew_up": false
+    },
+    {
+      "bit": 0,
+      "field": "mantissa",
+      "count": 16,
+      "divergence": 2.384185791015625e-07,
+      "n_injections": 4320,
+      "blew_up": false
+    }
+  ]
+}

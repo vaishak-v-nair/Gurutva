@@ -242,3 +242,100 @@ Engineering estimates only; Phase 3 is not an engineering estimate.
 Phases 0–2 are verifiable on one GPU: every gate a pytest, every number recomputable from a
 seed — the same discipline as `gravity-posterior`. Phase 3 cannot be simulated and is the
 first point requiring an outside dependency.
+
+---
+---
+
+# Appendix A — Phase 0 implementation design
+
+The immediate build. Everything here runs on one GPU with no external dependency.
+
+## Where it lives, and how it gets validated
+
+Two decisions taken by default, both reversible:
+
+- **Location: `sdc/` as a separated top-level directory in this repo, on the brainstorm
+  branch.** GitHub access this session is scoped to `vaishak-v-nair/gurutva`, so a new remote
+  repo is not creatable from here. This keeps the work pushed and durable against container
+  reclamation; `git subtree split` or `filter-repo` extracts it into its own repo later with
+  history intact. It does not touch or import from any geophysics code.
+- **Validation: CPU now, GPU-ready.** This container has neither a GPU nor torch. Bit-flip
+  arithmetic, RNG-stream separation, and the determinism gates are all device-agnostic, so
+  CPU torch on a tiny model genuinely passes Gates 0.1–0.3 and the difficulty curve is real.
+  CUDA-specific configuration (`CUBLAS_WORKSPACE_CONFIG`, TF32 disable) gets written but is
+  **explicitly marked unvalidated** until it runs on your rented GPU — an untested claim
+  labelled as tested is the one outcome worse than an untested claim.
+
+## Module layout
+
+```
+sdc/
+  inject.py     Injector — seeded, rate-controlled, bit-position-parameterised corruption
+  sites.py      Injection sites: GEMM output, all-reduce payload, optimizer state, activations
+  model.py      Small reference transformer (start ~20M params; scale to ~100M once green)
+  runner.py     Deterministic train loop, clean/injected modes, identical code path
+  record.py     Per-step telemetry: loss, grad norms, weight deltas, tensor checksums
+tests/
+  test_determinism.py    Gate 0.1
+  test_clean_pairs.py    Gate 0.2
+  test_divergence.py     Gate 0.3 (both directions)
+figures/
+  difficulty.py          Divergence vs bit position vs injection rate
+```
+
+## The one design decision that matters: bit position
+
+A bit flip is `view as int → XOR (1 << k) → view back`, and **k determines everything.**
+For fp32 (1 sign / 8 exponent / 23 mantissa):
+
+| Bit | Effect | Predicted | **Measured** (30 steps, gemm_out, ×16) |
+|---|---|---|---|
+| 31 (sign) | value negates | trivial | **~1e-2 — mild; the run trains through it** |
+| 30 (exponent MSB) | scales by ~2^128 — usually inf/NaN | trivial | inf/NaN at every volume ✓ |
+| 23 (exponent LSB) | doubles or halves | easy | ~2e-3 ✓ |
+| 22 (mantissa MSB) | up to ~50% relative error | moderate | ~4e-4 ✓ |
+| 0 (mantissa LSB) | ~1.2e-7 relative error | **invisible** | 2.4e-7 = one loss ULP ✓ |
+
+> **The sign-bit prediction was wrong, and Phase 0 caught it.** A sign flip is loud
+> in the tensor and nearly silent in the loss, so loss watching — the cheapest
+> signal in L0 — would miss it entirely. Phase 1 is harder than this plan assumed.
+> Full measured landscape in [`../sdc/README.md`](../sdc/README.md); regenerate with
+> `python -m sdc.figures.difficulty`.
+
+A harness that only flips exponent bits will make any detector look excellent and be
+worthless in production. The entire difficulty gradient of the problem lives on this axis,
+so `Injector` takes bit position as a first-class parameter and every result is reported
+against it — never marginalised away into a single "detection rate."
+
+**Note the precision caveat:** real training runs in bf16 (1/8/7), where the mantissa LSB is
+~2^-7 ≈ 0.8% relative error — far more visible per flip than fp32 intuition suggests, but
+against noisier gradients. Whether that nets out easier or harder is an empirical question
+Phase 0 answers rather than assumes. Build fp32 first for a clean determinism baseline, then
+repeat in bf16.
+
+## Two traps to get right up front
+
+1. **Separate RNG streams.** The injector must draw from a generator entirely independent of
+   the model's. Sharing one means the injected run diverges from clean through perturbed data
+   ordering and dropout rather than through injection — silently invalidating every
+   comparison in the project.
+2. **Determinism is a configuration, not a hope.** `torch.use_deterministic_algorithms(True)`,
+   `CUBLAS_WORKSPACE_CONFIG=:4096:8`, fixed seeds, TF32 explicitly disabled. Establish this
+   before writing the injector; Gate 0.2 fails loudly and early if it slips.
+
+## Gates (each a pytest)
+
+- **0.1 — Reproducible injection.** Same seed produces a bit-identical sequence of
+  `(step, site, flat_index, bit)` events. Asserted against a recorded manifest.
+- **0.2 — Clean determinism.** Two clean runs at the same seed produce bit-identical final
+  weights. This is the control that makes every later comparison meaningful.
+- **0.3 — Divergence, both directions.** At a stated rate and high bit position, an injected
+  run measurably diverges from clean. **And the negative control: at mantissa-LSB positions
+  it does *not* visibly diverge.** The negative half matters more — it proves a regime exists
+  that a detector cannot trivially see, which is the regime Phase 1 is actually built for.
+
+## Deliverable
+
+`figures/difficulty.png` — divergence against bit position and injection rate. That surface
+is the problem statement for Phase 1, and it sets the honest difficulty axis every later
+detection number gets reported against.
